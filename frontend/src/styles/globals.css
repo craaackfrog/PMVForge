@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════
+   PMVForge Theme
+   ─────────────────────────────────────────────────────────
+   Based on miguelsolorio/min-theme (dark) + shadcn tokens.
+   Edit the values below to restyle the entire application.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+
+  /* Radius */
+  --radius: 0.5rem;
+
+  /* ── Light (kept for completeness, app defaults to dark) ── */
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --primary: #1a1a1a;
+  --primary-foreground: #fafafa;
+  --secondary: #f4f4f4;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f4f4f4;
+  --muted-foreground: #737373;
+  --accent: #f4f4f4;
+  --accent-foreground: #1a1a1a;
+  --border: #e5e5e5;
+  --input: #e5e5e5;
+  --ring: #a3a3a3;
+  --destructive: #ef4444;
+}
+
+/* ── Dark theme (default) – min-theme inspired ───────────── */
+.dark {
+  --background: #1f1f1f;          /* editor.background */
+  --foreground: #e0e0e0;          /* input.foreground / soft white */
+  --card: #1a1a1a;                /* sideBar / activityBar */
+  --card-foreground: #f5f5f5;
+  --primary: #fafafa;             /* high-contrast text / buttons */
+  --primary-foreground: #1a1a1a;
+  --secondary: #2a2a2a;           /* input.background */
+  --secondary-foreground: #e0e0e0;
+  --muted: #2a2a2a;
+  --muted-foreground: #888888;    /* foreground from min-theme */
+  --accent: #262626;              /* list.hoverBackground */
+  --accent-foreground: #f5f5f5;
+  --border: #303030;              /* editor.lineHighlightBorder */
+  --input: #2a2a2a;
+  --ring: #444444;                /* focusBorder */
+  --destructive: #ff7a84;         /* soft red from min-theme accents */
+}
+
+/* ── Base ────────────────────────────────────────────────── */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-serif);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ── Utility helpers ─────────────────────────────────────── */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Fixed sidebar + main content margin fix */
+#nav {
+  position: fixed;
+  height: 100vh;
+}
+
+main {
+  margin-left: 14em;
+}
+
+/* Video modal margin */
+#videoModal {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}

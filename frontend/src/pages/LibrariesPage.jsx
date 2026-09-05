@@ -1,0 +1,674 @@
+import { useState, useEffect, useCallback } from 'react'
+import {
+  Library,
+  FolderPlus,
+  RefreshCw,
+  Trash2,
+  Loader2,
+  Tag,
+  Flame,
+  CheckSquare,
+  Square,
+  Play,
+  X,
+  Plus,
+  HelpCircle,
+} from 'lucide-react'
+import { playClick, playTap, playDone, playError } from '../lib/sounds'
+import { cn } from '../lib/utils'
+
+async function nativePick(endpoint, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  const url = qs ? `/api${endpoint}?${qs}` : `/api${endpoint}`
+  const res = await fetch(url, { method: 'POST' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || res.statusText)
+  }
+  return res.json()
+}
+
+function mediaUrl(path) {
+  return `/api/libraries/media?path=${encodeURIComponent(path)}`
+}
+
+export default function LibrariesPage() {
+  const [libraries, setLibraries] = useState([])
+  const [allTags, setAllTags] = useState([])
+  const [activeId, setActiveId] = useState(null)
+  const [clips, setClips] = useState([])
+  const [filterTags, setFilterTags] = useState([])
+  const [tagMode, setTagMode] = useState('any')
+  const [minHeat, setMinHeat] = useState(1)
+  const [selected, setSelected] = useState(new Set())
+  const [loading, setLoading] = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [error, setError] = useState(null)
+  const [bulkTag, setBulkTag] = useState('')
+  const [bulkHeat, setBulkHeat] = useState(3)
+  const [newTag, setNewTag] = useState('')
+  const [previewPath, setPreviewPath] = useState(null)
+  const [showHelp, setShowHelp] = useState(false)
+
+  const active = libraries.find((l) => l.id === activeId)
+
+  const refreshList = useCallback(async () => {
+    const res = await fetch('/api/libraries')
+    const data = await res.json()
+    setLibraries(data.libraries || [])
+    setAllTags(data.all_tags || [])
+  }, [])
+
+  const loadClips = useCallback(async () => {
+    if (!activeId) {
+      setClips([])
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/libraries/${activeId}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tags: filterTags,
+          tag_mode: tagMode,
+          min_heat: minHeat,
+          max_heat: 5,
+          limit: 0,
+        }),
+      })
+      const data = await res.json()
+      setClips(data.clips || [])
+      setSelected(new Set())
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [activeId, filterTags, tagMode, minHeat])
+
+  useEffect(() => {
+    refreshList().catch((e) => setError(e.message))
+  }, [refreshList])
+
+  useEffect(() => {
+    loadClips()
+  }, [loadClips])
+
+  async function addLibrary() {
+    playTap()
+    try {
+      const pick = await nativePick('/system/pick-folder', { title: 'Select clips folder' })
+      if (pick.cancelled || !pick.path) return
+      setLoading(true)
+      const res = await fetch('/api/libraries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: pick.path.split(/[/\\]/).filter(Boolean).pop() || 'Library',
+          root_path: pick.path,
+          recurse: true,
+          scan: true,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || res.statusText)
+      }
+      const lib = await res.json()
+      await refreshList()
+      setActiveId(lib.id)
+      playDone()
+    } catch (e) {
+      playError()
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function rescan() {
+    if (!activeId) return
+    playTap()
+    setScanning(true)
+    try {
+      const res = await fetch(`/api/libraries/${activeId}/scan`, { method: 'POST' })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Scan failed')
+      await refreshList()
+      await loadClips()
+      playDone()
+    } catch (e) {
+      playError()
+      setError(e.message)
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  async function removeLibrary() {
+    if (!activeId) return
+    if (!confirm('Remove this library from PMVForge? Files on disk are not deleted.')) return
+    playClick()
+    await fetch(`/api/libraries/${activeId}`, { method: 'DELETE' })
+    setActiveId(null)
+    await refreshList()
+  }
+
+  function toggleFilterTag(tag) {
+    playClick()
+    setFilterTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    )
+  }
+
+  function toggleSelect(path) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  function selectAll() {
+    playClick()
+    if (selected.size === clips.length) setSelected(new Set())
+    else setSelected(new Set(clips.map((c) => c.path)))
+  }
+
+  async function setClipHeat(path, heat) {
+    playClick()
+    await fetch(`/api/libraries/${activeId}/clip`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, heat }),
+    })
+    setClips((prev) => prev.map((c) => (c.path === path ? { ...c, heat } : c)))
+  }
+
+  async function toggleClipTag(path, tag, has) {
+    playClick()
+    const clip = clips.find((c) => c.path === path)
+    if (!clip) return
+    const tags = has
+      ? (clip.tags || []).filter((t) => t !== tag)
+      : [...(clip.tags || []), tag]
+    await fetch(`/api/libraries/${activeId}/clip`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, tags }),
+    })
+    setClips((prev) => prev.map((c) => (c.path === path ? { ...c, tags } : c)))
+  }
+
+  async function applyBulk() {
+    if (!activeId || selected.size === 0) return
+    playTap()
+    const body = { paths: [...selected] }
+    if (bulkTag.trim()) body.add_tags = [bulkTag.trim().toLowerCase()]
+    body.heat = bulkHeat
+    const res = await fetch(`/api/libraries/${activeId}/clips/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      playError()
+      return
+    }
+    playDone()
+    setBulkTag('')
+    await loadClips()
+    await refreshList()
+  }
+
+  async function createTag() {
+    const tag = newTag.trim().toLowerCase()
+    if (!tag) return
+    playTap()
+    const res = await fetch('/api/libraries/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag, library_id: activeId || null }),
+    })
+    if (!res.ok) {
+      playError()
+      setError((await res.json().catch(() => ({}))).detail || 'Could not add tag')
+      return
+    }
+    setNewTag('')
+    playDone()
+    await refreshList()
+  }
+
+  async function deleteTag(tag) {
+    if (!confirm(`Delete tag "${tag}" and strip it from clips?`)) return
+    playClick()
+    const qs = new URLSearchParams()
+    if (activeId) qs.set('library_id', activeId)
+    qs.set('strip_from_clips', 'true')
+    await fetch(`/api/libraries/tags/${encodeURIComponent(tag)}?${qs}`, { method: 'DELETE' })
+    setFilterTags((prev) => prev.filter((t) => t !== tag))
+    await refreshList()
+    await loadClips()
+  }
+
+  const vocab = active?.tags_vocab?.length ? active.tags_vocab : allTags
+
+  return (
+    <div className="space-y-5">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-serif text-3xl tracking-tight">Libraries</h1>
+          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+            Point at a clips folder, then tag and rate each file. In Generate, pick{' '}
+            <strong className="text-foreground">Library</strong> mode to pull by tag + heat.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowHelp((v) => !v)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-secondary text-sm hover:bg-accent"
+          >
+            <HelpCircle size={15} />
+            How to tag
+          </button>
+          <button
+            type="button"
+            onClick={addLibrary}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+          >
+            <FolderPlus size={16} />
+            Add folder
+          </button>
+        </div>
+      </header>
+
+      {showHelp && (
+        <div className="rounded-lg border border-border bg-card p-4 text-sm space-y-2 text-muted-foreground">
+          <p className="text-foreground font-medium">How tagging works</p>
+          <ol className="list-decimal list-inside space-y-1">
+            <li>
+              <strong className="text-foreground">Add folder</strong> indexes paths only (no upload).
+            </li>
+            <li>
+              Under each clip, click a <strong className="text-foreground">tag chip</strong> to toggle it on/off.
+              Lit = applied; muted = not on this clip.
+            </li>
+            <li>
+              Use <strong className="text-foreground">1–5 heat</strong> to rank intensity. Generate prefers higher heat.
+            </li>
+            <li>
+              Select many clips → type a tag / set heat → <strong className="text-foreground">Apply</strong>.
+            </li>
+            <li>
+              Manage vocabulary in the right <strong className="text-foreground">Tags</strong> panel.
+            </li>
+            <li>
+              <strong className="text-foreground">Play</strong> opens a preview modal.
+            </li>
+          </ol>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-destructive">
+          {typeof error === 'string' ? error : JSON.stringify(error)}{' '}
+          <button type="button" className="underline" onClick={() => setError(null)}>
+            dismiss
+          </button>
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[200px_minmax(0,1fr)_220px] gap-4 items-start">
+        <aside className="rounded-lg border border-border bg-card p-3 space-y-1.5">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground px-1 mb-2">Folders</p>
+          {libraries.length === 0 && (
+            <p className="text-sm text-muted-foreground px-1 py-3">No libraries yet. Hit Add folder.</p>
+          )}
+          {libraries.map((lib) => (
+            <button
+              key={lib.id}
+              type="button"
+              onClick={() => {
+                playClick()
+                setActiveId(lib.id)
+              }}
+              className={
+                activeId === lib.id
+                  ? 'w-full text-left px-3 py-2.5 rounded-md text-sm bg-accent text-accent-foreground'
+                  : 'w-full text-left px-3 py-2.5 rounded-md text-sm text-muted-foreground hover:bg-secondary hover:text-foreground'
+              }
+            >
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                <Library size={14} className="shrink-0" />
+                <span className="truncate">{lib.name}</span>
+              </div>
+              <div className="text-xs mt-0.5 opacity-70 pl-5">{lib.clip_count} clips</div>
+            </button>
+          ))}
+        </aside>
+
+        <section className="min-w-0 space-y-3">
+          {!activeId ? (
+            <div className="rounded-lg border border-dashed border-border bg-card/50 p-12 text-center text-sm text-muted-foreground">
+              Select or add a library to browse clips
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <h2 className="font-serif text-lg truncate">{active?.name}</h2>
+                  <p className="text-xs text-muted-foreground font-mono truncate" title={active?.root_path}>
+                    {active?.root_path}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={rescan}
+                  disabled={scanning}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent disabled:opacity-50"
+                >
+                  {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Rescan
+                </button>
+                <button
+                  type="button"
+                  onClick={removeLibrary}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm text-destructive hover:bg-accent"
+                >
+                  <Trash2 size={14} />
+                  Remove
+                </button>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Tag size={14} className="text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Filter</span>
+                  {['any', 'all'].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        playClick()
+                        setTagMode(m)
+                      }}
+                      className={
+                        tagMode === m
+                          ? 'px-2 py-0.5 rounded text-xs bg-primary text-primary-foreground'
+                          : 'px-2 py-0.5 rounded text-xs bg-secondary hover:bg-accent'
+                      }
+                    >
+                      {m}
+                    </button>
+                  ))}
+                  <span className="w-px h-4 bg-border mx-1" />
+                  <Flame size={14} className="text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Min heat</span>
+                  {[1, 2, 3, 4, 5].map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => {
+                        playClick()
+                        setMinHeat(h)
+                      }}
+                      className={
+                        minHeat === h
+                          ? 'w-6 h-6 rounded text-[11px] font-medium bg-orange-500 text-white'
+                          : 'w-6 h-6 rounded text-[11px] font-medium bg-secondary hover:bg-accent'
+                      }
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {vocab.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleFilterTag(tag)}
+                      className={
+                        filterTags.includes(tag)
+                          ? 'px-2 py-0.5 rounded-full text-xs bg-primary text-primary-foreground'
+                          : 'px-2 py-0.5 rounded-full text-xs bg-secondary hover:bg-accent'
+                      }
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-pink-500/30 bg-pink-500/5 px-3 py-2">
+                  <span className="text-sm font-medium">{selected.size} selected</span>
+                  <input
+                    type="text"
+                    value={bulkTag}
+                    onChange={(e) => setBulkTag(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && applyBulk()}
+                    placeholder="Add tag to selected…"
+                    className="px-2 py-1 rounded-md bg-secondary border border-border text-sm w-40"
+                  />
+                  <select
+                    value={bulkHeat}
+                    onChange={(e) => setBulkHeat(parseInt(e.target.value, 10))}
+                    className="px-2 py-1 rounded-md bg-secondary border border-border text-sm"
+                  >
+                    {[1, 2, 3, 4, 5].map((h) => (
+                      <option key={h} value={h}>
+                        Heat {h}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={applyBulk}
+                    className="px-3 py-1 rounded-md bg-pink-500 text-white text-sm font-medium hover:bg-pink-400"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="inline-flex items-center gap-1.5 hover:text-foreground"
+                >
+                  {selected.size === clips.length && clips.length > 0 ? (
+                    <CheckSquare size={14} />
+                  ) : (
+                    <Square size={14} />
+                  )}
+                  Select all visible
+                </button>
+                <span>{loading ? 'Loading…' : `${clips.length} clips`}</span>
+              </div>
+
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <div className="max-h-[min(62vh,720px)] overflow-y-auto divide-y divide-border">
+                  {clips.map((clip) => {
+                    const isSel = selected.has(clip.path)
+                    const applied = new Set(clip.tags || [])
+                    return (
+                      <div
+                        key={clip.path}
+                        className={
+                          isSel
+                            ? 'flex gap-3 px-3 py-2.5 items-center bg-accent/50'
+                            : 'flex gap-3 px-3 py-2.5 items-center hover:bg-secondary/30'
+                        }
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleSelect(clip.path)}
+                          className="text-muted-foreground shrink-0"
+                        >
+                          {isSel ? <CheckSquare size={16} /> : <Square size={16} />}
+                        </button>
+
+                        <button
+                          type="button"
+                          title="Preview"
+                          onClick={() => {
+                            playClick()
+                            setPreviewPath(clip.path)
+                          }}
+                          className="shrink-0 p-1.5 rounded-md bg-secondary hover:bg-accent"
+                        >
+                          <Play size={14} />
+                        </button>
+
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="text-sm font-medium truncate" title={clip.path}>
+                            {clip.name || clip.path.split(/[/\\]/).pop()}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {vocab.map((tag) => {
+                              const has = applied.has(tag)
+                              return (
+                                <button
+                                  key={tag}
+                                  type="button"
+                                  title={has ? `Remove "${tag}"` : `Add "${tag}"`}
+                                  onClick={() => toggleClipTag(clip.path, tag, has)}
+                                  className={
+                                    has
+                                      ? 'px-1.5 py-0 rounded text-[10px] leading-5 bg-primary text-primary-foreground'
+                                      : 'px-1.5 py-0 rounded text-[10px] leading-5 bg-secondary/70 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                                  }
+                                >
+                                  {tag}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex gap-0.5 shrink-0" title="Heat ranking">
+                          {[1, 2, 3, 4, 5].map((h) => (
+                            <button
+                              key={h}
+                              type="button"
+                              onClick={() => setClipHeat(clip.path, h)}
+                              className={
+                                (clip.heat || 3) >= h
+                                  ? 'w-6 h-6 rounded text-[10px] font-medium bg-orange-500/90 text-white'
+                                  : 'w-6 h-6 rounded text-[10px] font-medium bg-secondary text-muted-foreground hover:bg-accent'
+                              }
+                            >
+                              {h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {!loading && clips.length === 0 && (
+                    <p className="p-8 text-sm text-muted-foreground text-center">
+                      No clips match filters. Clear filters or rescan.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+
+        <aside className="rounded-lg border border-border bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Tag size={15} />
+            <h3 className="font-serif text-base">Tags</h3>
+          </div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Create custom tags here. Click a chip under any clip to apply it.
+          </p>
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={newTag}
+              onChange={(e) => setNewTag(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && createTag()}
+              placeholder="New tag…"
+              className="flex-1 min-w-0 px-2 py-1.5 rounded-md bg-secondary border border-border text-sm"
+            />
+            <button
+              type="button"
+              onClick={createTag}
+              disabled={!newTag.trim()}
+              className="px-2.5 rounded-md bg-primary text-primary-foreground disabled:opacity-40"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+          <ul className="space-y-1 max-h-[50vh] overflow-y-auto">
+            {vocab.map((tag) => (
+              <li
+                key={tag}
+                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/60 text-sm group"
+              >
+                <span className="truncate">{tag}</span>
+                <button
+                  type="button"
+                  title="Delete tag"
+                  onClick={() => deleteTag(tag)}
+                  className="opacity-40 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive"
+                >
+                  <X size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      </div>
+
+      {previewPath && (
+        <VideoModal
+          src={mediaUrl(previewPath)}
+          title={previewPath.split(/[/\\]/).pop()}
+          onClose={() => setPreviewPath(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function VideoModal({ src, title, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      id="videoModal"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-4xl rounded-xl overflow-hidden border border-border bg-card shadow-2xl">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+          <span className="text-sm font-medium truncate pr-4">{title || 'Preview'}</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <video src={src} controls autoPlay className="w-full max-h-[75vh] bg-black" />
+      </div>
+    </div>
+  )
+}

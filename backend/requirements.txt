@@ -1,0 +1,20 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+python-multipart>=0.0.12
+pydantic>=2.9.0
+librosa>=0.10.2
+soundfile>=0.12.1
+numpy>=1.26.0
+aiofiles>=24.1.0
+platformdirs>=4.3.0
+tqdm>=4.66.0
+Pillow>=10.0.0
+# Optional — only for PMV "Face center" toggle:
+# opencv-python-headless>=4.8.0,<5
+
+# System dependency (not pip):
+#   ffmpeg + ffprobe must be on PATH
+#
+# Intentionally NOT included (broken / unused on modern Python):
+#   Gooey, pydub, colour, matplotlib, simfile, halo
+
