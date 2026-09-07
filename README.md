@@ -1,96 +1,62 @@
 # PMVForge
 
-**All-in-one local tool for creating PMVs from beatmaps and funscripts.**
+Local all-in-one tool for PMVs, beatmaps, and Cock Hero overlays.
 
-Local web UI (React + FastAPI) that replaces the original Beats2Fun desktop tools and adds a powerful Beatmap Creator with an interactive waveform editor.
+## Stack
 
----
-
-## Features
-
-- **Beat Creator**
-  - Automatic beat detection (librosa)
-  - Interactive waveform editor (add / move / delete beats)
-  - Title / Artist / Creator metadata
-  - Export as `.osu`, `.txt` or `.funscript`
-- **PMV Generation**
-  - Full pipeline (beat input + video folder → output video)
-  - All original quality / performance options
-  - Optional beatbar overlay
-  - GPU (CUDA) support
-  - Background job with live progress
-- Dark minimal UI (min-theme inspired + shadcn style)
-- Easy rebranding via a single config file
-- Temp files in `C:\temp-pmv`
-- Recent history
-
----
+- **Backend:** FastAPI (Python 3.11+)
+- **Frontend:** React + Vite + Tailwind
+- **Video:** ffmpeg / ffprobe on PATH
 
 ## Quick start (Windows)
 
-1. Make sure you have **Python 3.11+** and **Node.js 18+** installed.
-2. Also make sure **ffmpeg** is on your PATH (required for PMV generation).
-3. Double-click:
-
-```
+```bat
 scripts\start.bat
 ```
 
-This opens two terminals (backend + frontend).  
-Then open **http://localhost:5173** in your browser.
+Or separately:
 
----
-
-## Project structure
-
-```
-PMVForge/
-├── backend/
-│   ├── app/
-│   │   ├── config.py          ← rename the whole app here
-│   │   ├── main.py
-│   │   ├── api/               ← REST endpoints
-│   │   └── services/
-│   │       ├── beat_detector.py
-│   │       ├── pmv_generator.py
-│   │       └── legacy/        ← original Beats2Fun code (wrapped)
-│   └── requirements.txt
-├── frontend/                  ← React + Vite + Tailwind
-├── scripts/                   ← Windows start scripts
-└── README.md
+```bat
+scripts\start-backend.bat
+scripts\start-frontend.bat
 ```
 
----
+- UI: http://localhost:5173  
+- API: http://127.0.0.1:8742  
 
-## Renaming the project
+Backend venv:
 
-Open `backend/app/config.py` and change:
-
-```python
-PROJECT_NAME = "PMVForge"
-PROJECT_SLUG = "pmvforge"
+```bat
+cd backend
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --host 127.0.0.1 --port 8742 --reload
 ```
 
-Most user-facing strings derive from these values.  
-Frontend constants live in `frontend/src/lib/config.js` — keep them in sync.
+Frontend:
 
----
+```bat
+cd frontend
+npm install
+npm run dev
+```
 
-## Development status
+## Features
 
-- [x] Project scaffold + rename system
-- [x] FastAPI skeleton
-- [x] Beat detection + export
-- [x] Interactive waveform editor
-- [x] PMV generation service (first version)
-- [x] Generate page with live job progress
-- [ ] Polish / edge-case handling on generation
-- [x] Folder browser dialogs (native)
-- [ ] Queue of multiple jobs
-- [ ] Docker support
+- Beat Creator / Editor (waveform, .osu)
+- PMV Generate (16:9 / 9:16, HD–4K, zoom-to-fill, library tags/heat)
+- Beat effects post-pass (pulse, flash, pink glow, tonemap, LUT)
+- Modes / presets
+- Source libraries + tags
+- Cock Hero beatbar export
+- Settings (temp path, defaults, cleanup)
 
----
+## Config
 
-## Original inspiration
+- Settings: `%APPDATA%\pmvforge\settings.json`
+- Temp default: `G:\temp-pmv` (override in Settings or `PMVFORGE_TEMP`)
 
-Based on [Beats2Fun](https://github.com/Nootna8/Beats2Fun) by Nootna8.
+## License
+
+Local / personal use. Original Beats2Fun inspiration retained as concept only; runtime code is a clean rewrite.
