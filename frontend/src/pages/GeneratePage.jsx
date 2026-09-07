@@ -593,7 +593,6 @@ export default function GeneratePage() {
                 <NumberField label="Max flashes / sec" value={form.effects.flash_max_per_sec} step={1} min={1} max={12} onChange={(v) => updateEffect('flash_max_per_sec', v)} />
               </div>
             )}
-            </div>
           </div>
         )}
       </section>
