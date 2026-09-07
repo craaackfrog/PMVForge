@@ -92,7 +92,7 @@ class Library:
     name: str
     root_path: str
     recurse: bool = True
-    tags_vocab: List[str] = field(default_factory=lambda: list(DEFAULT_TAGS))
+    tags_vocab: List[str] = field(default_factory=list)
     clips: Dict[str, dict] = field(default_factory=dict)  # path -> ClipMeta dict
     created_at: str = ""
     updated_at: str = ""
@@ -202,7 +202,7 @@ def create_library(name: str, root_path: str, recurse: bool = True) -> Library:
         name=name or root.name,
         root_path=str(root.resolve()),
         recurse=recurse,
-        tags_vocab=list(DEFAULT_TAGS),
+        tags_vocab=list(load_global_tags()),
         created_at=_now(),
         updated_at=_now(),
     )
@@ -428,64 +428,153 @@ def query_clips(
     return results
 
 
-def all_tags() -> List[str]:
+def _tags_path() -> Path:
+    return _lib_dir() / "tags.json"
+
+
+def _normalize_tag(tag: str) -> str:
+    return (tag or "").strip().lower()
+
+
+def load_global_tags() -> List[str]:
+    """
+    Single source of truth for tag vocabulary.
+    Stored at {config}/libraries/tags.json
+    Seeded from DEFAULT_TAGS + any tags already on libraries/clips (once).
+    """
+    path = _tags_path()
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            tags = {_normalize_tag(t) for t in (data.get("tags") or []) if _normalize_tag(t)}
+            return sorted(tags)
+        except Exception:
+            pass
+
     tags: Set[str] = set(DEFAULT_TAGS)
     for e in list_libraries():
         lib = load_library(e["id"])
         if not lib:
             continue
-        tags.update(t.lower() for t in lib.tags_vocab)
+        tags.update(_normalize_tag(t) for t in (lib.tags_vocab or []) if _normalize_tag(t))
         for c in lib.clips.values():
-            tags.update(t.lower() for t in (c.get("tags") or []))
-    return sorted(tags)
+            tags.update(_normalize_tag(t) for t in (c.get("tags") or []) if _normalize_tag(t))
+    return save_global_tags(sorted(tags))
+
+
+def save_global_tags(tags: List[str]) -> List[str]:
+    cleaned = sorted({_normalize_tag(t) for t in tags if _normalize_tag(t)})
+    path = _tags_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"tags": cleaned}, indent=2), encoding="utf-8")
+    return cleaned
+
+
+def all_tags() -> List[str]:
+    """Alphabetically sorted global vocabulary."""
+    return load_global_tags()
+
+
+def _sync_tag_to_libraries(tag: str, *, add: bool, strip_from_clips: bool = False) -> None:
+    """Keep per-library tags_vocab (and optionally clips) in sync with global ops."""
+    tag = _normalize_tag(tag)
+    if not tag:
+        return
+    for e in list_libraries():
+        lib = load_library(e["id"])
+        if not lib:
+            continue
+        changed = False
+        if add:
+            if tag not in lib.tags_vocab:
+                lib.tags_vocab = sorted(set(lib.tags_vocab) | {tag})
+                changed = True
+        else:
+            if tag in lib.tags_vocab:
+                lib.tags_vocab = [t for t in lib.tags_vocab if t != tag]
+                changed = True
+            if strip_from_clips:
+                for key, clip in list(lib.clips.items()):
+                    old = list(clip.get("tags") or [])
+                    new_tags = [t for t in old if t != tag]
+                    if new_tags != old:
+                        c = dict(clip)
+                        c["tags"] = new_tags
+                        lib.clips[key] = c
+                        changed = True
+        if changed:
+            save_library(lib)
 
 
 def add_tag_to_vocab(lib_id: Optional[str], tag: str) -> List[str]:
-    """Add tag to one library vocab, or all libraries if lib_id is None."""
-    tag = tag.strip().lower()
+    """Add tag to the global vocabulary (and sync library vocabs). Always returns sorted global tags."""
+    tag = _normalize_tag(tag)
     if not tag:
         raise ValueError("Empty tag")
+    tags = set(load_global_tags())
+    tags.add(tag)
+    result = save_global_tags(list(tags))
+    # Sync: all libraries if global, or one library if specified
     if lib_id:
         lib = load_library(lib_id)
         if not lib:
             raise ValueError("Library not found")
         if tag not in lib.tags_vocab:
-            lib.tags_vocab.append(tag)
+            lib.tags_vocab = sorted(set(lib.tags_vocab) | {tag})
             save_library(lib)
-        return lib.tags_vocab
-    # global: add to every library + return all_tags
-    for e in list_libraries():
-        lib = load_library(e["id"])
-        if lib and tag not in lib.tags_vocab:
-            lib.tags_vocab.append(tag)
-            save_library(lib)
-    return all_tags()
+    else:
+        _sync_tag_to_libraries(tag, add=True)
+    return result
 
 
 def remove_tag_from_vocab(lib_id: Optional[str], tag: str, strip_from_clips: bool = False) -> List[str]:
-    tag = tag.strip().lower()
-    targets = []
+    """
+    Remove tag from global vocabulary (always when no lib_id).
+    When lib_id is set, remove from that library's vocab; still drop from global
+    if the tag is no longer used anywhere, but Tags panel delete should pass lib_id=None.
+    Always returns the current sorted global tag list so the UI can refresh.
+    """
+    tag = _normalize_tag(tag)
+    if not tag:
+        raise ValueError("Empty tag")
+
     if lib_id:
         lib = load_library(lib_id)
         if not lib:
             raise ValueError("Library not found")
-        targets = [lib]
-    else:
-        for e in list_libraries():
-            lib = load_library(e["id"])
-            if lib:
-                targets.append(lib)
-    for lib in targets:
         lib.tags_vocab = [t for t in lib.tags_vocab if t != tag]
         if strip_from_clips:
             for key, clip in list(lib.clips.items()):
-                tags = [t for t in (clip.get("tags") or []) if t != tag]
-                if tags != clip.get("tags"):
+                old = list(clip.get("tags") or [])
+                new_tags = [t for t in old if t != tag]
+                if new_tags != old:
                     c = dict(clip)
-                    c["tags"] = tags
+                    c["tags"] = new_tags
                     lib.clips[key] = c
         save_library(lib)
-    return all_tags() if not lib_id else (load_library(lib_id).tags_vocab if load_library(lib_id) else [])
+        # If tag is gone from every library vocab and all clips, drop from global too
+        still_used = False
+        for e in list_libraries():
+            other = load_library(e["id"])
+            if not other:
+                continue
+            if tag in (other.tags_vocab or []):
+                still_used = True
+                break
+            for c in other.clips.values():
+                if tag in (c.get("tags") or []):
+                    still_used = True
+                    break
+            if still_used:
+                break
+        if not still_used:
+            save_global_tags([t for t in load_global_tags() if t != tag])
+    else:
+        # Global delete from Tags panel: drop everywhere
+        save_global_tags([t for t in load_global_tags() if t != tag])
+        _sync_tag_to_libraries(tag, add=False, strip_from_clips=strip_from_clips)
+
+    return all_tags()
 
 
 def is_path_in_any_library(path: str) -> bool:

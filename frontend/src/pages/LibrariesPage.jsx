@@ -56,7 +56,7 @@ export default function LibrariesPage() {
     const res = await fetch('/api/libraries')
     const data = await res.json()
     setLibraries(data.libraries || [])
-    setAllTags(data.all_tags || [])
+    setAllTags([...(data.all_tags || [])].sort((a, b) => a.localeCompare(b)))
   }, [])
 
   const loadClips = useCallback(async () => {
@@ -229,12 +229,16 @@ export default function LibrariesPage() {
     const res = await fetch('/api/libraries/tags', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tag, library_id: activeId || null }),
+      body: JSON.stringify({ tag, library_id: null }),
     })
     if (!res.ok) {
       playError()
       setError((await res.json().catch(() => ({}))).detail || 'Could not add tag')
       return
+    }
+    const data = await res.json().catch(() => ({}))
+    if (Array.isArray(data.tags)) {
+      setAllTags([...data.tags].sort((a, b) => a.localeCompare(b)))
     }
     setNewTag('')
     playDone()
@@ -244,16 +248,28 @@ export default function LibrariesPage() {
   async function deleteTag(tag) {
     if (!confirm(`Delete tag "${tag}" and strip it from clips?`)) return
     playClick()
+    // Always delete from the global vocabulary so the Tags panel updates immediately
     const qs = new URLSearchParams()
-    if (activeId) qs.set('library_id', activeId)
     qs.set('strip_from_clips', 'true')
-    await fetch(`/api/libraries/tags/${encodeURIComponent(tag)}?${qs}`, { method: 'DELETE' })
+    const res = await fetch(`/api/libraries/tags/${encodeURIComponent(tag)}?${qs}`, { method: 'DELETE' })
+    if (!res.ok) {
+      playError()
+      setError((await res.json().catch(() => ({}))).detail || 'Could not delete tag')
+      return
+    }
+    const data = await res.json().catch(() => ({}))
+    if (Array.isArray(data.tags)) {
+      setAllTags([...data.tags].sort((a, b) => a.localeCompare(b)))
+    } else {
+      setAllTags((prev) => prev.filter((t) => t !== tag))
+    }
     setFilterTags((prev) => prev.filter((t) => t !== tag))
     await refreshList()
-    await loadClips()
+    if (activeId) await loadClips()
   }
 
-  const vocab = active?.tags_vocab?.length ? active.tags_vocab : allTags
+  // Single sorted vocabulary for the whole UI (global tags store)
+  const vocab = [...allTags].sort((a, b) => a.localeCompare(b))
 
   return (
     <div className="space-y-5">
