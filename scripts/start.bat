@@ -18,8 +18,8 @@ timeout /t 3 /nobreak > nul
 start "PMVForge Frontend" cmd /k "%~dp0start-frontend.bat"
 
 echo.
-echo Backend  → http://127.0.0.1:8742
-echo Frontend → http://localhost:5173
+echo Backend  -> http://127.0.0.1:8742
+echo Frontend -> http://localhost:5173
 echo.
 echo Both windows have been opened.
 echo Close them to stop the servers.
