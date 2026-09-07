@@ -49,8 +49,6 @@ const DEFAULTS = {
     pink_glow: false,
     pink_glow_strength: 0.35,
     pink_glow_saturation: 1.15,
-    tonemap: 'none',
-    lut_path: '',
   },
 }
 
@@ -595,47 +593,6 @@ export default function GeneratePage() {
                 <NumberField label="Max flashes / sec" value={form.effects.flash_max_per_sec} step={1} min={1} max={12} onChange={(v) => updateEffect('flash_max_per_sec', v)} />
               </div>
             )}
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">Tonemap look</label>
-              <div className="flex flex-wrap gap-2">
-                {['none', 'hable', 'reinhard', 'mobius'].map((tm) => (
-                  <button
-                    key={tm}
-                    type="button"
-                    onClick={() => updateEffect('tonemap', tm)}
-                    className={chipClass(form.effects.tonemap === tm)}
-                  >
-                    {tm}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-muted-foreground mb-1.5">LUT file (.cube)</label>
-              <div className="flex gap-2">
-                <span className="flex-1 text-sm font-mono truncate text-muted-foreground px-3 py-2 rounded-md border border-dashed border-border">
-                  {form.effects.lut_path || 'None'}
-                </span>
-                <button
-                  type="button"
-                  className="px-3 py-2 rounded-md bg-secondary text-sm hover:bg-accent"
-                  onClick={async () => {
-                    try {
-                      const d = await nativePick('/system/pick-file', { kind: 'any', title: 'Select LUT (.cube)' })
-                      if (!d.cancelled && d.path) updateEffect('lut_path', d.path)
-                    } catch (e) {
-                      setError(e.message)
-                    }
-                  }}
-                >
-                  Browse
-                </button>
-                {form.effects.lut_path && (
-                  <button type="button" className="px-2 py-2 text-sm text-muted-foreground" onClick={() => updateEffect('lut_path', '')}>
-                    Clear
-                  </button>
-                )}
-              </div>
             </div>
           </div>
         )}

@@ -825,8 +825,6 @@ class PMVGenerator:
                     pink_glow=bool(fx_raw.get("pink_glow", False)),
                     pink_glow_strength=float(fx_raw.get("pink_glow_strength", 0.35)),
                     pink_glow_saturation=float(fx_raw.get("pink_glow_saturation", 1.15)),
-                    tonemap=str(fx_raw.get("tonemap") or "none"),
-                    lut_path=fx_raw.get("lut_path") or None,
                 )
                 fx_out = work_dir / "effects.mp4"
                 apply_effects(

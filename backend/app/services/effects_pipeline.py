@@ -1,7 +1,7 @@
 """
 Beat-synced visual effects post-pass.
 
-Static looks (pink glow, tonemap, LUT) → ffmpeg filters.
+Static looks (pink glow) → ffmpeg filters.
 Timed looks (pulse, flash, punch, RGB) → frame pipeline (numpy + ffmpeg pipes)
 so long beatmaps work without giant enable= expressions or fragile sendcmd.
 """
@@ -42,8 +42,6 @@ class EffectsOptions:
     pink_glow_strength: float = 0.35
     pink_glow_saturation: float = 1.15
 
-    tonemap: str = "none"
-    lut_path: Optional[str] = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -87,18 +85,6 @@ def _near_beat(t: float, beats: np.ndarray, half_win: float) -> bool:
 
 def _build_static_vf(opts: EffectsOptions) -> str:
     filters: List[str] = []
-    if opts.tonemap and opts.tonemap != "none":
-        if opts.tonemap == "hable":
-            filters.append("eq=contrast=1.05:gamma=1.05:saturation=1.05")
-        elif opts.tonemap == "reinhard":
-            filters.append("eq=contrast=0.95:gamma=1.1:brightness=0.02")
-        else:
-            filters.append("eq=contrast=1.08:gamma=0.95:saturation=1.08")
-
-    if opts.lut_path and Path(opts.lut_path).is_file():
-        lut = str(Path(opts.lut_path).resolve()).replace("\\", "/").replace(":", "\\:")
-        filters.append(f"lut3d=file='{lut}'")
-
     if opts.pink_glow and opts.pink_glow_strength > 0:
         s = max(0.0, min(1.0, float(opts.pink_glow_strength)))
         sat = max(0.5, min(2.0, float(opts.pink_glow_saturation)))

@@ -46,7 +46,7 @@ npm run dev
 
 - Beat Creator / Editor (waveform, .osu)
 - PMV Generate (16:9 / 9:16, HD–4K, zoom-to-fill, library tags/heat)
-- Beat effects post-pass (pulse, flash, pink glow, tonemap, LUT)
+- Beat effects post-pass (pulse, flash, pink glow)
 - Source libraries + tags
 - Cock Hero beatbar export
 - Settings (temp path, defaults, cleanup)
