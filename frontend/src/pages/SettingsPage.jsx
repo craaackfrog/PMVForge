@@ -290,10 +290,6 @@ export default function SettingsPage() {
         />
       </section>
 
-
-      {/* Presets */}
-      <PresetsSection />
-
       {/* Cleanup */}
       <section className="rounded-lg border border-border bg-card p-5 space-y-4">
         <h2 className="font-serif text-lg flex items-center gap-2">
@@ -491,94 +487,3 @@ function Select({ label, value, onChange, options }) {
 }
 
 
-function PresetsSection() {
-  const [presets, setPresets] = useState([])
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/presets')
-      .then((r) => r.json())
-      .then((d) => setPresets(d.presets || []))
-      .catch(() => {})
-  }, [])
-
-  async function remove(id) {
-    if (!confirm('Delete this custom mode?')) return
-    playClick()
-    setBusy(true)
-    try {
-      await fetch(`/api/presets/${id}`, { method: 'DELETE' })
-      setPresets((p) => p.filter((x) => x.id !== id))
-      playDone()
-    } catch {
-      playError()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function dup(id) {
-    playTap()
-    setBusy(true)
-    try {
-      const res = await fetch(`/api/presets/${id}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      })
-      const created = await res.json()
-      setPresets((p) => [created, ...p])
-      playDone()
-    } catch {
-      playError()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <section className="rounded-lg border border-border bg-card p-5 space-y-3">
-      <h2 className="font-serif text-lg">Modes / presets</h2>
-      <p className="text-xs text-muted-foreground">
-        Built-in modes cannot be deleted. Duplicate them to customize. Create new ones from Generate → Save current.
-      </p>
-      <ul className="divide-y divide-border rounded-md border border-border">
-        {presets.map((p) => (
-          <li key={p.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">
-                {p.name}
-                {p.builtin && (
-                  <span className="ml-2 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    built-in
-                  </span>
-                )}
-              </div>
-              {p.description && (
-                <div className="text-xs text-muted-foreground truncate">{p.description}</div>
-              )}
-            </div>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => dup(p.id)}
-              className="px-2 py-1 rounded bg-secondary text-xs hover:bg-accent"
-            >
-              Duplicate
-            </button>
-            {!p.builtin && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => remove(p.id)}
-                className="px-2 py-1 rounded bg-secondary text-xs text-destructive hover:bg-accent"
-              >
-                Delete
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}

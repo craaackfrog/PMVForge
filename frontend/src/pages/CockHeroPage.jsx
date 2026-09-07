@@ -69,17 +69,6 @@ export default function CockHeroPage() {
   }
 
   
-  // Apply mode defaults stashed by Generate → Create Cock Hero / Mode picker
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem('pmvforge:ch-preset')
-      if (!raw) return
-      const data = JSON.parse(raw)
-      const ch = data.cockhero || {}
-      if (!Object.keys(ch).length) return
-      setForm((f) => ({ ...f, ...ch }))
-    } catch (_) {}
-  }, [])
 
   useEffect(() => {
     if (sessionFromUrl) {
