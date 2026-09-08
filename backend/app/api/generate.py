@@ -341,18 +341,10 @@ async def start_generation_upload(
         effects=None,
     )
 
-    now = _now()
-    _jobs[job_id] = {
-        "job_id": job_id,
-        "status": "queued",
-        "progress": 0.0,
-        "message": f"Queued · {saved} clips",
-        "result": None,
-        "created_at": now,
-        "updated_at": now,
-    }
+    job_store.update_job(job_id, message=f"Queued · {saved} clips")
     background_tasks.add_task(_run_job, job_id, options)
-    return JobStatus(**_jobs[job_id])
+    job = job_store.get_job(job_id)
+    return JobStatus(**{k: job.get(k) for k in JobStatus.model_fields})
 
 
 @router.get("/status/{job_id}", response_model=JobStatus)
