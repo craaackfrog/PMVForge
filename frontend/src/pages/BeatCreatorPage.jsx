@@ -122,7 +122,7 @@ export default function BeatCreatorPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${title || 'beats'}.${fmt === 'osu' ? 'osu' : fmt === 'txt' ? 'txt' : 'funscript'}`
+    a.download = `${title || 'beats'}.${fmt === 'osu' ? 'osu' : 'txt'}`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -265,13 +265,6 @@ export default function BeatCreatorPage() {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent transition-colors disabled:opacity-40"
               >
                 <Download size={14} /> .txt
-              </button>
-              <button
-                onClick={() => handleExport('funscript')}
-                disabled={!beats.length}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent transition-colors disabled:opacity-40"
-              >
-                <Download size={14} /> .funscript
               </button>
             </div>
           </div>

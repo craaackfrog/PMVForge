@@ -239,7 +239,7 @@ export default function CockHeroPage() {
         <section className="rounded-lg border border-border bg-card p-6 space-y-4">
           <h2 className="font-serif text-lg">Start from existing files</h2>
           <p className="text-sm text-muted-foreground">
-            Pick a finished PMV video and its beatmap (.osu / .txt / .funscript).
+            Pick a finished PMV video and its beatmap (.osu / .txt).
           </p>
           <div className="flex gap-2 items-center">
             <span className="text-sm text-muted-foreground w-20 shrink-0">Video</span>

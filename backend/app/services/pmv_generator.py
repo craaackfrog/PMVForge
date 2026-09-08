@@ -107,7 +107,7 @@ def resolve_resolution(aspect: str, quality: str, custom: Optional[str] = None) 
 def load_beat_times(path: str) -> Tuple[List[float], Optional[str], str]:
     """
     Returns (beat_times_seconds, song_path_or_None, display_name).
-    Supports .osu / .txt / .funscript / .json.
+    Supports .osu / .txt / .json.
     """
     p = Path(path)
     if not p.exists():
@@ -115,7 +115,7 @@ def load_beat_times(path: str) -> Tuple[List[float], Optional[str], str]:
 
     if p.is_dir():
         # pick first supported file inside
-        for ext in (".osu", ".funscript", ".txt", ".sm", ".ssc"):
+        for ext in (".osu", ".txt", ".json", ".sm", ".ssc"):
             hits = list(p.glob(f"*{ext}"))
             if hits:
                 return load_beat_times(str(hits[0]))
@@ -142,7 +142,7 @@ def load_beat_times(path: str) -> Tuple[List[float], Optional[str], str]:
                 break
         return beats, song, name
 
-    if ext in (".funscript", ".json"):
+    if ext == ".json":
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
         actions = data.get("actions") or []

@@ -24,7 +24,7 @@ from ..services.pmv_generator import (
 router = APIRouter()
 
 
-BEAT_EXTS = {".osu", ".txt", ".funscript", ".json"}
+BEAT_EXTS = {".osu", ".txt", ".json"}
 
 
 class GenerateRequest(BaseModel):
@@ -234,7 +234,7 @@ async def start_generation_paths(req: StartPathsRequest, background_tasks: Backg
 @router.post("/start-upload", response_model=JobStatus)
 async def start_generation_upload(
     background_tasks: BackgroundTasks,
-    beat_file: UploadFile = File(..., description="Beatmap (.osu / .txt / .funscript)"),
+    beat_file: UploadFile = File(..., description="Beatmap (.osu / .txt / .json)"),
     videos: List[UploadFile] = File(..., description="One or more video clips"),
     song_file: Optional[UploadFile] = File(None),
     output_folder: str = Form(""),

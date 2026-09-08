@@ -131,7 +131,7 @@ def export_beats(
 ) -> Path:
     """
     Write beats to the requested format and return the output path.
-    Supported fmt: "osu" | "txt" | "funscript"
+    Supported fmt: "osu" | "txt"
     """
     if output_dir is None:
         from ..config import get_temp_dir
@@ -150,31 +150,7 @@ def export_beats(
                 f.write(f"{t:.3f}\n")
         return out_path
 
-    if fmt == "funscript":
-        out_path = output_dir / f"{base_name}.funscript"
-        actions = []
-        flag = True
-        for t in beat_times:
-            pos = 90 if flag else 10
-            flag = not flag
-            actions.append({"at": int(round(t * 1000)), "pos": pos})
-
-        data = {
-            "version": "1.0",
-            "inverted": False,
-            "range": 90,
-            "actions": actions,
-            "metadata": {
-                "title": title,
-                "artist": artist,
-                "creator": creator,
-                "generated_by": "PMVForge",
-            },
-        }
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        return out_path
-
+    # Default
     # Default → .osu
     out_path = output_dir / f"{base_name}.osu"
     _write_osu(

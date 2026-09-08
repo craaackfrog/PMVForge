@@ -27,7 +27,7 @@ export default function HomePage() {
           </div>
           <p className="text-sm text-muted-foreground mb-4">
             Detect beats from any song, fine-tune them on a waveform,
-            and export ready-to-use .osu / .txt / .funscript files.
+            and export ready-to-use .osu / .txt files.
           </p>
           <span className="inline-flex items-center gap-1 text-sm text-foreground group-hover:gap-2 transition-all">
             Open <ArrowRight size={14} />

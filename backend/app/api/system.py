@@ -132,7 +132,7 @@ async def api_pick_file(
 ):
     filetypes = {
         "beat": [
-            ("Beatmaps", "*.osu *.txt *.funscript *.json"),
+            ("Beatmaps", "*.osu *.txt *.json"),
             ("osu!", "*.osu"),
         ],
         "audio": [

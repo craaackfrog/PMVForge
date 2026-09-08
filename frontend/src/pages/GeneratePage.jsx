@@ -412,7 +412,7 @@ export default function GeneratePage() {
 
 <section className="rounded-lg border border-border bg-card p-6 space-y-5">
         <h2 className="font-serif text-lg">Inputs</h2>
-        <PathRow label="Beatmap" value={beatPath} placeholder="Select a .osu / .funscript / .txt…" onBrowse={browseBeat} onClear={() => setBeatPath('')} busy={picking === 'beat'} icon={Music2} />
+        <PathRow label="Beatmap" value={beatPath} placeholder="Select a .osu / .txt / .json…" onBrowse={browseBeat} onClear={() => setBeatPath('')} busy={picking === 'beat'} icon={Music2} />
         <PathRow label="Song override (optional)" value={songPath} placeholder="Only if audio isn’t next to the beatmap…" onBrowse={browseSong} onClear={() => setSongPath('')} busy={picking === 'song'} icon={FileAudio} />
 
         <div>
