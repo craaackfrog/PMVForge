@@ -67,3 +67,53 @@ async def add_history_entry(entry: dict):
 async def clear_history():
     _save_history([])
     return {"ok": True}
+
+
+PROJECTS_FILE = "projects.json"
+
+
+def _projects_path() -> Path:
+    return get_config_dir() / PROJECTS_FILE
+
+
+def _load_projects() -> list:
+    path = _projects_path()
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def _save_projects(items: list):
+    _projects_path().write_text(json.dumps(items, indent=2), encoding="utf-8")
+
+
+@router.get("/saved")
+async def list_projects(limit: int = 50):
+    return _load_projects()[:limit]
+
+
+@router.post("/saved")
+async def save_project(entry: dict):
+    """Save a named generate draft / project snapshot."""
+    items = _load_projects()
+    entry = dict(entry)
+    entry["timestamp"] = datetime.utcnow().isoformat() + "Z"
+    entry["app"] = PROJECT_NAME
+    if not entry.get("id"):
+        import uuid
+        entry["id"] = str(uuid.uuid4())
+    items = [i for i in items if i.get("id") != entry["id"]]
+    items.insert(0, entry)
+    items = items[:40]
+    _save_projects(items)
+    return {"ok": True, "project": entry}
+
+
+@router.delete("/saved/{project_id}")
+async def delete_project(project_id: str):
+    items = [i for i in _load_projects() if i.get("id") != project_id]
+    _save_projects(items)
+    return {"ok": True}

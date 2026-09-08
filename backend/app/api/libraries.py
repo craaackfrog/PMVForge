@@ -7,7 +7,6 @@ from __future__ import annotations
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
-from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Literal
 
@@ -115,6 +114,30 @@ async def stream_clip(path: str = Query(..., description="Absolute path to a lib
         ".avi": "video/x-msvideo",
     }.get(suffix, "application/octet-stream")
     return FileResponse(path, media_type=media, filename=Path(path).name)
+
+
+@router.get("/thumbnail")
+async def clip_thumbnail(path: str = Query(..., description="Absolute path to a library clip")):
+    """Extract a JPEG thumbnail for a library clip."""
+    if not path or not Path(path).is_file():
+        raise HTTPException(404, "File not found")
+    if not store.is_path_in_any_library(path):
+        raise HTTPException(403, "Path is not inside a registered library")
+    from ..config import get_temp_dir
+    import hashlib, subprocess
+    h = hashlib.sha1(path.encode("utf-8")).hexdigest()[:16]
+    out = get_temp_dir() / "thumbs" / f"{h}.jpg"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not out.exists() or out.stat().st_size == 0:
+        cmd = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-ss", "1", "-i", path, "-frames:v", "1",
+            "-vf", "scale=320:-2", "-q:v", "5", str(out),
+        ]
+        subprocess.run(cmd, capture_output=True, timeout=30)
+        if not out.exists():
+            raise HTTPException(500, "Thumbnail failed")
+    return FileResponse(str(out), media_type="image/jpeg", filename=out.name)
 
 
 @router.get("/{lib_id}")

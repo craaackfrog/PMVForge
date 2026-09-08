@@ -32,6 +32,10 @@ function mediaUrl(path) {
   return `/api/libraries/media?path=${encodeURIComponent(path)}`
 }
 
+function thumbUrl(path) {
+  return `/api/libraries/thumbnail?path=${encodeURIComponent(path)}`
+}
+
 export default function LibrariesPage() {
   const [libraries, setLibraries] = useState([])
   const [allTags, setAllTags] = useState([])
@@ -543,7 +547,10 @@ export default function LibrariesPage() {
 
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="text-sm font-medium truncate" title={clip.path}>
-                            {clip.name || clip.path.split(/[/\\]/).pop()}
+                            <span className="inline-flex items-center gap-2 min-w-0">
+                              <img src={thumbUrl(clip.path)} alt="" className="w-10 h-10 rounded object-cover bg-secondary shrink-0" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                              <span className="truncate">{clip.name || clip.path.split(/[/\\]/).pop()}</span>
+                            </span>
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {vocab.map((tag) => {

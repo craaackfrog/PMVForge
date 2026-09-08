@@ -263,6 +263,29 @@ export default function GeneratePage() {
     finally { setPicking(null) }
   }
 
+  async function saveProject() {
+    playTap()
+    try {
+      const res = await fetch('/api/projects/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: beatPath.split(/[/\\]/).pop() || 'Untitled project',
+          type: 'generate',
+          draft: {
+            form, beatPath, songPath, clipMode, videoFolder, videoPaths,
+            outputFolder, libraryId, libraryTags, libraryTagMode, libraryMinHeat,
+          },
+        }),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      playDone()
+    } catch (e) {
+      playError()
+      setError(e.message)
+    }
+  }
+
   async function startJob() {
     const hasClips =
       (clipMode === 'all' && videoFolder) ||
@@ -627,6 +650,9 @@ export default function GeneratePage() {
       </section>
 
       <div className="flex items-center gap-4">
+        <button type="button" onClick={saveProject} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm hover:bg-accent">
+          Save project
+        </button>
         <button onClick={() => { playTap(); startJob() }} disabled={submitting || isRunning || !canStart}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity">
           {submitting || isRunning ? (<><Loader2 size={16} className="animate-spin" />{isRunning ? 'Generating…' : 'Starting…'}</>) : (<><Film size={16} />Generate PMV</>)}
