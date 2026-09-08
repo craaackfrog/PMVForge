@@ -31,7 +31,7 @@ class EffectsOptions:
     flash_max_per_sec: float = 8.0
 
     zoom_punch: bool = True
-    zoom_punch_amount: float = 5.06
+    zoom_punch_amount: float = 1.06
     zoom_punch_ms: float = 150
 
     rgb_split: bool = False
@@ -193,7 +193,7 @@ def _apply_timed_frames(
 
     pulse_amt = max(0.0, min(0.6, float(opts.soft_pulse_strength)))
     flash_amt = max(0.0, min(1.0, float(opts.flash_strength)))
-    punch_c = max(1.0, min(1.25, float(opts.zoom_punch_amount)))  # use as contrast proxy
+    # zoom_punch_amount applied per-frame as scale
     rgb_px = int(max(1, min(16, float(opts.rgb_split_px))))
 
     dec = subprocess.Popen(
@@ -245,10 +245,18 @@ def _apply_timed_frames(
             frame = np.clip(frame.astype(np.float32) + 255.0 * flash_amt, 0, 255).astype(np.uint8)
 
         if opts.zoom_punch and _near_beat(t, pulse_beats, punch_half):
-            # contrast around mid-gray
-            f = frame.astype(np.float32)
-            f = (f - 128.0) * punch_c + 128.0
-            frame = np.clip(f, 0, 255).astype(np.uint8)
+            scale = max(1.0, min(1.25, float(opts.zoom_punch_amount)))
+            if scale > 1.001:
+                nh, nw = int(h / scale), int(w / scale)
+                nh -= nh % 2
+                nw -= nw % 2
+                if nh > 0 and nw > 0:
+                    y0 = (h - nh) // 2
+                    x0 = (w - nw) // 2
+                    crop = frame[y0:y0 + nh, x0:x0 + nw]
+                    ys = (np.linspace(0, nh - 1, h)).astype(np.int32)
+                    xs = (np.linspace(0, nw - 1, w)).astype(np.int32)
+                    frame = crop[ys][:, xs]
 
         if opts.rgb_split and _near_beat(t, pulse_beats, rgb_half):
             frame = _rgb_shift(frame, rgb_px)

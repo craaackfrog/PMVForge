@@ -385,12 +385,21 @@ def render_cockhero(options: CockHeroOptions, progress_cb=None) -> CockHeroResul
         )
         raw_out = work / "video_no_audio.mp4"
         encoder = "h264_nvenc" if options.cuda else "libx264"
-        enc = subprocess.Popen(
-            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-             "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", f"{src_fps}",
-             "-i", "-", "-c:v", encoder, "-pix_fmt", "yuv420p", "-an", str(raw_out)],
-            stdin=subprocess.PIPE, stderr=subprocess.PIPE,
-        )
+        if options.cuda:
+            enc_cmd = [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", f"{src_fps}",
+                "-i", "-", "-c:v", "h264_nvenc", "-preset", "p4", "-pix_fmt", "yuv420p",
+                "-an", str(raw_out),
+            ]
+        else:
+            enc_cmd = [
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{w}x{h}", "-r", f"{src_fps}",
+                "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+                "-pix_fmt", "yuv420p", "-an", str(raw_out),
+            ]
+        enc = subprocess.Popen(enc_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 
         frame_size = w * h * 3
         frame_i = 0
