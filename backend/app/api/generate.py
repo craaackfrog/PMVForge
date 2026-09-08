@@ -248,6 +248,8 @@ async def start_generation_upload(
     cuda: str = Form("false"),
     debug: str = Form("false"),
     num_vids: int = Form(0),
+    clip_order: str = Form("random"),
+    effects: str = Form(""),
 ):
     """
     Browser-friendly start: upload beatmap + clips (and optional song).
@@ -317,6 +319,14 @@ async def start_generation_upload(
     if quality not in ("hd", "fhd", "4k"):
         quality = "hd"
 
+    effects_obj = None
+    if effects and effects.strip():
+        try:
+            effects_obj = json.loads(effects)
+        except Exception:
+            effects_obj = None
+    order = clip_order if clip_order in ("random", "forward", "sticky") else "random"
+
     options = PMVJobOptions(
         beat_input=str(beat_path),
         video_folder=str(video_dir),
@@ -328,12 +338,13 @@ async def start_generation_upload(
         aspect=aspect,
         quality=quality,
         zoom_to_fill=zoom_to_fill_b,
+        clip_order=order,
         fps=fps,
         bitrate=bitrate or None,
         threads=threads,
         cuda=cuda_b,
         debug=debug_b,
-        effects=None,
+        effects=effects_obj,
     )
 
     job_store.update_job(job_id, message=f"Queued · {saved} clips")
