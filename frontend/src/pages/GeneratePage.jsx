@@ -584,7 +584,10 @@ export default function GeneratePage() {
           <div className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-3">
               <Toggle label="Soft pulse" checked={!!form.effects.soft_pulse} onChange={(v) => updateEffect('soft_pulse', v)} hint="Gentle brightness on each beat" />
-              <Toggle label="Zoom punch (sharpen)" checked={!!form.effects.zoom_punch} onChange={(v) => updateEffect('zoom_punch', v)} />
+              <Toggle label="Zoom punch" checked={!!form.effects.zoom_punch} onChange={(v) => updateEffect('zoom_punch', v)} hint="Brief center zoom on each beat" />
+              {form.effects.zoom_punch && (
+                <NumberField label="Zoom amount" value={form.effects.zoom_punch_amount ?? 1.06} step={0.01} min={1.01} max={1.2} onChange={(v) => updateEffect('zoom_punch_amount', v)} />
+              )}
               <Toggle label="RGB split" checked={!!form.effects.rgb_split} onChange={(v) => updateEffect('rgb_split', v)} />
               <Toggle
                 label="Flash / strobe"
