@@ -685,9 +685,11 @@ class PMVGenerator:
         self,
         options: PMVJobOptions,
         progress_cb: Optional[Callable[[str, float], None]] = None,
+        cancel_cb: Optional[Callable[[], bool]] = None,
     ):
         self.options = options
         self.progress_cb = progress_cb or (lambda msg, pct: None)
+        self.cancel_cb = cancel_cb or (lambda: False)
         self.logs: List[str] = []
 
     def _log(self, msg: str):
@@ -757,11 +759,16 @@ class PMVGenerator:
                 f"order={order} · zoom_to_fill={zoom} · face_center={face}"
             )
 
+            if self.cancel_cb():
+                return PMVJobResult(False, message="Cancelled", logs=self.logs)
+
             self._progress("Rendering clips…", 0.25)
             done = 0
             errors = []
 
             def _one(plan: ClipPlan):
+                if self.cancel_cb():
+                    return
                 render_clip(
                     plan, resolution, bitrate, opts.fps, zoom, opts.cuda,
                     face_center=face,
@@ -770,6 +777,10 @@ class PMVGenerator:
             with ThreadPoolExecutor(max_workers=max(1, opts.threads)) as ex:
                 futs = {ex.submit(_one, p): p for p in plans}
                 for fut in as_completed(futs):
+                    if self.cancel_cb():
+                        for f in futs:
+                            f.cancel()
+                        return PMVJobResult(False, message="Cancelled", logs=self.logs)
                     done += 1
                     if done % 5 == 0 or done == len(plans):
                         self._progress(

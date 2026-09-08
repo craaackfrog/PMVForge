@@ -355,6 +355,19 @@ export default function GeneratePage() {
     else if (status.status === 'error') playError()
   }, [status])
 
+  async function cancelJob() {
+    if (!jobId) return
+    playTap()
+    try {
+      const res = await fetch(`/api/generate/cancel/${jobId}`, { method: 'POST' })
+      if (!res.ok) throw new Error('Cancel failed')
+      setStatus(await res.json())
+    } catch (e) {
+      playError()
+      setError(e.message)
+    }
+  }
+
   const isRunning = status && (status.status === 'queued' || status.status === 'running')
   const resHint = RES_HINT[form.aspect]?.[form.quality] || ''
   const videoUrl =
@@ -618,6 +631,11 @@ export default function GeneratePage() {
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity">
           {submitting || isRunning ? (<><Loader2 size={16} className="animate-spin" />{isRunning ? 'Generating…' : 'Starting…'}</>) : (<><Film size={16} />Generate PMV</>)}
         </button>
+        {isRunning && (
+          <button type="button" onClick={cancelJob} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm text-destructive hover:bg-accent">
+            Cancel
+          </button>
+        )}
         {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 

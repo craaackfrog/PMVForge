@@ -16,6 +16,7 @@ from .config import (
     PORT,
 )
 from .api import router as api_router
+from .services import job_store
 
 app = FastAPI(
     title=PROJECT_NAME,
@@ -37,6 +38,9 @@ app.add_middleware(
 
 # API routes
 app.include_router(api_router, prefix="/api")
+
+# Hydrate persisted jobs (marks interrupted runs)
+job_store.load_all()
 
 
 @app.get("/")

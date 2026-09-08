@@ -7,12 +7,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Literal
 from pathlib import Path
-import uuid
 import json
 import shutil
 from datetime import datetime
 
 from ..config import get_config_dir, get_temp_dir, PROJECT_NAME
+from ..services import job_store
 from ..services.pmv_generator import (
     PMVGenerator,
     PMVJobOptions,
@@ -23,7 +23,6 @@ from ..services.pmv_generator import (
 
 router = APIRouter()
 
-_jobs: dict[str, dict] = {}
 
 BEAT_EXTS = {".osu", ".txt", ".funscript", ".json"}
 
@@ -63,6 +62,7 @@ class JobStatus(BaseModel):
     created_at: str
     updated_at: str
     elapsed_seconds: Optional[float] = None
+    cancelled: bool = False
 
 
 def _now() -> str:
@@ -76,36 +76,53 @@ def _save_upload(file: UploadFile, dest: Path):
 
 
 def _run_job(job_id: str, options: PMVJobOptions):
-    job = _jobs[job_id]
-    job["status"] = "running"
-    job["updated_at"] = _now()
-    job["message"] = "Starting…"
-    job["started_at"] = _now()
     import time as _time
     _t0 = _time.time()
+    job_store.update_job(job_id, status="running", message="Starting…", started_at=_now())
 
     def progress_cb(msg: str, pct: float):
-        job["message"] = msg
-        job["progress"] = pct
-        job["updated_at"] = _now()
+        if job_store.is_cancelled(job_id):
+            return
+        job_store.update_job(job_id, message=msg, progress=pct)
 
-    generator = PMVGenerator(options, progress_cb=progress_cb)
+    cancel_cb = job_store.cancel_checker(job_id)
+    generator = PMVGenerator(options, progress_cb=progress_cb, cancel_cb=cancel_cb)
     result: PMVJobResult = generator.run()
-
-    job["updated_at"] = _now()
     elapsed = _time.time() - _t0
-    job["elapsed_seconds"] = elapsed
-    job["progress"] = 1.0 if result.success else job.get("progress", 0)
-    job["status"] = "finished" if result.success else "error"
-    job["message"] = result.message
-    job["result"] = {
-        "success": result.success,
-        "output_video": result.output_video,
-        "logs": result.logs,
-        "elapsed_seconds": elapsed,
-        "beat_input": options.beat_input,
-        "song_path": options.song_path,
-    }
+
+    if job_store.is_cancelled(job_id) or (result.message or "").lower().startswith("cancelled"):
+        job_store.update_job(
+            job_id,
+            status="cancelled",
+            message="Cancelled",
+            elapsed_seconds=elapsed,
+            cancelled=True,
+            result={
+                "success": False,
+                "output_video": None,
+                "logs": result.logs,
+                "elapsed_seconds": elapsed,
+                "beat_input": options.beat_input,
+                "song_path": options.song_path,
+            },
+        )
+        return
+
+    job_store.update_job(
+        job_id,
+        status="finished" if result.success else "error",
+        message=result.message,
+        progress=1.0 if result.success else (job_store.get_job(job_id) or {}).get("progress", 0),
+        elapsed_seconds=elapsed,
+        result={
+            "success": result.success,
+            "output_video": result.output_video,
+            "logs": result.logs,
+            "elapsed_seconds": elapsed,
+            "beat_input": options.beat_input,
+            "song_path": options.song_path,
+        },
+    )
 
     try:
         history_path = get_config_dir() / "history.json"
@@ -128,20 +145,10 @@ def _run_job(job_id: str, options: PMVJobOptions):
         pass
 
 
-def _queue_job(options: PMVJobOptions, background_tasks: BackgroundTasks) -> dict:
-    job_id = str(uuid.uuid4())
-    now = _now()
-    _jobs[job_id] = {
-        "job_id": job_id,
-        "status": "queued",
-        "progress": 0.0,
-        "message": "Queued",
-        "result": None,
-        "created_at": now,
-        "updated_at": now,
-    }
-    background_tasks.add_task(_run_job, job_id, options)
-    return _jobs[job_id]
+def _queue_job(options: PMVJobOptions, background_tasks: BackgroundTasks, extra: dict | None = None) -> dict:
+    job = job_store.create_job(extra)
+    background_tasks.add_task(_run_job, job["job_id"], options)
+    return job
 
 
 @router.get("/presets")
@@ -267,7 +274,8 @@ async def start_generation_upload(
     if not videos:
         raise HTTPException(400, "Select at least one video clip")
 
-    job_id = str(uuid.uuid4())
+    job = job_store.create_job({"message": "Staging uploads…"})
+    job_id = job["job_id"]
     stage = get_temp_dir() / "uploads" / job_id
     video_dir = stage / "videos"
     video_dir.mkdir(parents=True, exist_ok=True)
@@ -349,22 +357,30 @@ async def start_generation_upload(
 
 @router.get("/status/{job_id}", response_model=JobStatus)
 async def get_status(job_id: str):
-    job = _jobs.get(job_id)
+    job = job_store.get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    return JobStatus(**job)
+    return JobStatus(**{k: job.get(k) for k in JobStatus.model_fields})
+
+
+@router.post("/cancel/{job_id}", response_model=JobStatus)
+async def cancel_job(job_id: str):
+    job = job_store.request_cancel(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return JobStatus(**{k: job.get(k) for k in JobStatus.model_fields})
 
 
 @router.get("/jobs", response_model=List[JobStatus])
 async def list_jobs(limit: int = 20):
-    items = sorted(_jobs.values(), key=lambda j: j["created_at"], reverse=True)
-    return [JobStatus(**j) for j in items[:limit]]
+    items = job_store.list_jobs(limit)
+    return [JobStatus(**{k: j.get(k) for k in JobStatus.model_fields}) for j in items]
 
 
 @router.get("/video/{job_id}")
 async def stream_video(job_id: str):
     """Stream the finished PMV for in-browser preview."""
-    job = _jobs.get(job_id)
+    job = job_store.get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     if job.get("status") != "finished":
@@ -383,7 +399,7 @@ async def stream_video(job_id: str):
 @router.get("/download/{job_id}")
 async def download_video(job_id: str):
     """Force-download the finished PMV."""
-    job = _jobs.get(job_id)
+    job = job_store.get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     path = (job.get("result") or {}).get("output_video")
