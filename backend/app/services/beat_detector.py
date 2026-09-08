@@ -127,6 +127,7 @@ def export_beats(
     fmt: str = "osu",
     output_dir: Path = None,
     job_id: str = "export",
+    audio_filename: str = "",
 ) -> Path:
     """
     Write beats to the requested format and return the output path.
@@ -182,6 +183,7 @@ def export_beats(
         artist=artist,
         creator=creator,
         output_path=out_path,
+        audio_filename=audio_filename or "audio.ogg",
     )
     return out_path
 
@@ -194,6 +196,7 @@ def _write_osu(
     output_path: Path,
     version: str = "AutoBeats",
     bpm: float = 120.0,
+    audio_filename: str = "audio.ogg",
 ):
     times_ms = [int(round(t * 1000)) for t in beat_times]
     first_time = times_ms[0] if times_ms else 0
@@ -203,7 +206,7 @@ def _write_osu(
         "osu file format v14",
         "",
         "[General]",
-        "AudioFilename: audio.ogg",
+        f"AudioFilename: {audio_filename or 'audio.ogg'}",
         "AudioLeadIn: 0",
         "PreviewTime: -1",
         "Countdown: 0",

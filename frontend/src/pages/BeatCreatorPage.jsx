@@ -105,6 +105,8 @@ export default function BeatCreatorPage() {
     form.append('creator', creator || APP_NAME)
     form.append('format', fmt)
     form.append('beats', JSON.stringify(beats))
+    const audioName = (file && file.name) || (audioPath && audioPath.split(/[/\\]/).pop()) || ''
+    if (audioName) form.append('audio_filename', audioName)
 
     const res = await fetch('/api/beats/export', {
       method: 'POST',

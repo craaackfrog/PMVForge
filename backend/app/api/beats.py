@@ -85,6 +85,7 @@ async def export_beatmap(
     creator: str = Form("PMVForge"),
     format: str = Form("osu"),
     beats: str = Form(...),
+    audio_filename: str = Form(""),
 ):
     """
     Export the (possibly manually edited) beat list to the requested format.
@@ -107,6 +108,7 @@ async def export_beatmap(
         fmt=format,
         output_dir=temp_dir,
         job_id=job_id,
+        audio_filename=audio_filename,
     )
 
     return FileResponse(
