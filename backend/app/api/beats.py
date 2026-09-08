@@ -24,6 +24,28 @@ def _save_upload(file: UploadFile, dest: Path):
         shutil.copyfileobj(file.file, f)
 
 
+@router.post("/detect-path")
+async def detect_beats_path(
+    path: str = Form(...),
+    min_gap: float = Form(0.30),
+):
+    """Detect beats from an absolute audio path on the host (native picker)."""
+    p = Path(path)
+    if not p.is_file():
+        raise HTTPException(400, f"Audio not found: {path}")
+    suffix = p.suffix.lower()
+    if suffix not in AUDIO_EXTS:
+        raise HTTPException(400, f"Unsupported audio format: {suffix}")
+    try:
+        result = detect_beats_from_file(str(p), min_gap=min_gap)
+        result["job_id"] = str(uuid.uuid4())
+        result["audio_filename"] = p.name
+        result["audio_path"] = str(p.resolve())
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"Beat detection failed: {str(e)}")
+
+
 @router.post("/detect")
 async def detect_beats(
     file: UploadFile = File(...),

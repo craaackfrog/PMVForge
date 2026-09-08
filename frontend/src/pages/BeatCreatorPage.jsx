@@ -1,11 +1,24 @@
 import { useState } from 'react'
 import { usePersistentState } from '../hooks/usePersistentState'
 import { APP_NAME } from '../lib/config'
-import { Upload, Download, Loader2 } from 'lucide-react'
+import { Upload, Download, Loader2, FolderOpen } from 'lucide-react'
 import WaveformEditor from '../components/WaveformEditor'
+
+async function nativePick(endpoint, params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  const url = qs ? `/api${endpoint}?${qs}` : `/api${endpoint}`
+  const res = await fetch(url, { method: 'POST' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail || res.statusText)
+  }
+  return res.json()
+}
 
 export default function BeatCreatorPage() {
   const [file, setFile] = useState(null) // File objects can't survive reload
+  const [audioPath, setAudioPath] = useState('')
+  const [picking, setPicking] = useState(false)
   const [meta, setMeta] = usePersistentState('pmvforge:beat-creator', {
     title: '',
     artist: '',
@@ -25,22 +38,45 @@ export default function BeatCreatorPage() {
   const [beats, setBeats] = useState([])
   const [error, setError] = useState(null)
 
+  async function browseAudio() {
+    setPicking(true)
+    setError(null)
+    try {
+      const data = await nativePick('/system/pick-file', { kind: 'audio', title: 'Select audio' })
+      if (!data.cancelled && data.path) {
+        setAudioPath(data.path)
+        setFile(null)
+        if (!title) {
+          const name = data.path.split(/[/\\]/).pop() || ''
+          setTitle(name.replace(/\.[^/.]+$/, ''))
+        }
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setPicking(false)
+    }
+  }
+
   async function handleDetect() {
-    if (!file) return
+    if (!file && !audioPath) return
     setLoading(true)
     setError(null)
     setResult(null)
     setBeats([])
-
-    const form = new FormData()
-    form.append('file', file)
-    form.append('min_gap', minGap)
-
     try {
-      const res = await fetch('/api/beats/detect', {
-        method: 'POST',
-        body: form,
-      })
+      let res
+      if (audioPath) {
+        const form = new FormData()
+        form.append('path', audioPath)
+        form.append('min_gap', minGap)
+        res = await fetch('/api/beats/detect-path', { method: 'POST', body: form })
+      } else {
+        const form = new FormData()
+        form.append('file', file)
+        form.append('min_gap', minGap)
+        res = await fetch('/api/beats/detect', { method: 'POST', body: form })
+      }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.detail || res.statusText)
@@ -48,9 +84,9 @@ export default function BeatCreatorPage() {
       const data = await res.json()
       setResult(data)
       setBeats(data.beats || [])
-
-      if (!title && file.name) {
-        setTitle(file.name.replace(/\.[^/.]+$/, ''))
+      if (!title) {
+        const name = (file && file.name) || (audioPath && audioPath.split(/[/\\]/).pop()) || ''
+        if (name) setTitle(name.replace(/\.[^/.]+$/, ''))
       }
     } catch (e) {
       setError(e.message)
@@ -112,22 +148,25 @@ export default function BeatCreatorPage() {
           <label className="block text-sm text-muted-foreground mb-1.5">
             Audio file
           </label>
-          <label
-            className="flex items-center gap-3 px-4 py-3 rounded-md border border-dashed border-border bg-secondary/40 cursor-pointer hover:bg-secondary/70 transition-colors"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={onDrop}
-          >
-            <Upload size={18} className="text-muted-foreground" />
-            <span className="text-sm">
-              {file ? file.name : 'Choose or drop an audio file…'}
-            </span>
-            <input
-              type="file"
-              accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-          </label>
+          <div className="flex gap-2">
+            <label
+              className="flex-1 flex items-center gap-3 px-4 py-3 rounded-md border border-dashed border-border bg-secondary/40 cursor-pointer hover:bg-secondary/70 transition-colors min-h-[48px]"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => { setAudioPath(''); onDrop(e) }}
+            >
+              <Upload size={18} className="text-muted-foreground shrink-0" />
+              <span className="text-sm truncate">
+                {audioPath ? audioPath : file ? file.name : 'Choose, drop, or browse an audio file…'}
+              </span>
+              <input type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a" className="hidden"
+                onChange={(e) => { setAudioPath(''); setFile(e.target.files?.[0] || null) }} />
+            </label>
+            <button type="button" onClick={browseAudio} disabled={picking}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-secondary text-sm hover:bg-accent disabled:opacity-50 shrink-0">
+              {picking ? <Loader2 size={14} className="animate-spin" /> : <FolderOpen size={14} />}
+              Browse
+            </button>
+          </div>
         </div>
 
         <div className="grid sm:grid-cols-3 gap-4">
@@ -180,7 +219,7 @@ export default function BeatCreatorPage() {
 
           <button
             onClick={handleDetect}
-            disabled={!file || loading}
+            disabled={(!file && !audioPath) || loading}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
           >
             {loading ? (
