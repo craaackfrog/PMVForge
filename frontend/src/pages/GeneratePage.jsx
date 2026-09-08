@@ -26,7 +26,6 @@ const DEFAULTS = {
   aspect: '16:9',
   quality: 'hd',
   zoom_to_fill: false,
-  face_center: false,
   clip_order: 'random',
   fps: 30,
   bitrate: '',
@@ -214,7 +213,6 @@ export default function GeneratePage() {
       const next = { ...prev, [key]: value }
       if (key === 'aspect' && value === '9:16') {
         if (!prev.zoom_to_fill) next.zoom_to_fill = true
-        if (!prev.face_center) next.face_center = true
       }
       return next
     })
@@ -538,7 +536,6 @@ export default function GeneratePage() {
         </div>
         <div className="flex flex-wrap gap-6">
           <Toggle label="Zoom to fill (center crop)" hint="Scale up and crop so the frame is always full — recommended for 9:16" checked={form.zoom_to_fill} onChange={(v) => update('zoom_to_fill', v)} />
-          <Toggle label="Face center (OpenCV)" hint="Detect a face in each clip and bias the 9:16 crop toward it." checked={form.face_center} onChange={(v) => { update('face_center', v); if (v && !form.zoom_to_fill) update('zoom_to_fill', true, { silent: true }) }} />
         </div>
 
       
@@ -584,7 +581,10 @@ export default function GeneratePage() {
           <div className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-3">
               <Toggle label="Soft pulse" checked={!!form.effects.soft_pulse} onChange={(v) => updateEffect('soft_pulse', v)} hint="Gentle brightness on each beat" />
-              <Toggle label="Zoom punch (sharpen)" checked={!!form.effects.zoom_punch} onChange={(v) => updateEffect('zoom_punch', v)} />
+              <Toggle label="Zoom punch" checked={!!form.effects.zoom_punch} onChange={(v) => updateEffect('zoom_punch', v)} hint="Brief center zoom on each beat" />
+              {form.effects.zoom_punch && (
+                <NumberField label="Zoom amount" value={form.effects.zoom_punch_amount ?? 1.06} step={0.01} min={1.01} max={1.2} onChange={(v) => updateEffect('zoom_punch_amount', v)} />
+              )}
               <Toggle label="RGB split" checked={!!form.effects.rgb_split} onChange={(v) => updateEffect('rgb_split', v)} />
               <Toggle
                 label="Flash / strobe"

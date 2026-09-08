@@ -42,7 +42,6 @@ class GenerateRequest(BaseModel):
     quality: Literal["hd", "fhd", "4k"] = "hd"
     resolution: Optional[str] = None
     zoom_to_fill: bool = False
-    face_center: bool = False
     clip_order: Literal["random", "forward", "sticky"] = "random"
     effects: Optional[dict] = None
 
@@ -177,7 +176,6 @@ class StartPathsRequest(BaseModel):
     quality: Literal["hd", "fhd", "4k"] = "hd"
     resolution: Optional[str] = None
     zoom_to_fill: bool = False
-    face_center: bool = False
     clip_order: Literal["random", "forward", "sticky"] = "random"
     effects: Optional[dict] = None
 
@@ -244,7 +242,6 @@ async def start_generation_upload(
     aspect: str = Form("16:9"),
     quality: str = Form("hd"),
     zoom_to_fill: str = Form("false"),
-    face_center: str = Form("false"),
     fps: int = Form(30),
     bitrate: str = Form(""),
     threads: int = Form(4),
@@ -260,7 +257,6 @@ async def start_generation_upload(
         return str(v).strip().lower() in ("1", "true", "yes", "on")
 
     zoom_to_fill_b = _as_bool(zoom_to_fill)
-    face_center_b = _as_bool(face_center)
     cuda_b = _as_bool(cuda)
     debug_b = _as_bool(debug)
 
@@ -332,7 +328,6 @@ async def start_generation_upload(
         aspect=aspect,
         quality=quality,
         zoom_to_fill=zoom_to_fill_b,
-        face_center=face_center_b,
         fps=fps,
         bitrate=bitrate or None,
         threads=threads,

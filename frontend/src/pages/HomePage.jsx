@@ -65,7 +65,7 @@ export default function HomePage() {
           </div>
           <p className="text-sm text-muted-foreground mb-4">
             Turn a beatmap + a folder of clips into a full PMV with
-            aspect/resolution options, face center, and clip order modes.
+            aspect/resolution options and clip order modes.
           </p>
           <span className="inline-flex items-center gap-1 text-sm text-foreground group-hover:gap-2 transition-all">
             Open <ArrowRight size={14} />

@@ -9,9 +9,6 @@ aiofiles>=24.1.0
 platformdirs>=4.3.0
 tqdm>=4.66.0
 Pillow>=10.0.0
-# Optional — only for PMV "Face center" toggle:
-# opencv-python-headless>=4.8.0,<5
-
 # System dependency (not pip):
 #   ffmpeg + ffprobe must be on PATH
 #
