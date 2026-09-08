@@ -119,6 +119,9 @@ def _run_job(job_id: str, options: PMVJobOptions):
             "success": result.success,
             "timestamp": _now(),
             "app": PROJECT_NAME,
+            "job_id": job_id,
+            "beat_input": options.beat_input,
+            "song_path": options.song_path,
         })
         history_path.write_text(json.dumps(items[:50], indent=2), encoding="utf-8")
     except Exception:
