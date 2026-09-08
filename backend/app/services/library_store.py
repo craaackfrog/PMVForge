@@ -285,28 +285,37 @@ def scan_library(lib_id: str, progress_cb=None) -> Library:
     old = dict(lib.clips)
     new_clips: Dict[str, dict] = {}
     total = len(unique)
-    for i, f in enumerate(unique):
+
+    def _one(f: Path):
         try:
             key = str(f.resolve())
         except Exception:
             key = str(f)
         prev = old.get(key) or old.get(str(f))
-        # re-probe if new or mtime changed
         mtime = f.stat().st_mtime if f.exists() else 0
         if prev and float(prev.get("mtime") or 0) == mtime:
-            meta = prev
-        else:
-            probe = _probe_quick(f)
-            meta = {
-                "path": key,
-                "name": f.name,
-                "tags": list(prev.get("tags") or []) if prev else [],
-                "heat": int(prev.get("heat") or 3) if prev else 3,
-                **probe,
-            }
-        new_clips[key] = meta
-        if progress_cb and i % 10 == 0:
-            progress_cb(i, total)
+            return key, prev
+        probe = _probe_quick(f)
+        meta = {
+            "path": key,
+            "name": f.name,
+            "tags": list(prev.get("tags") or []) if prev else [],
+            "heat": int(prev.get("heat") or 3) if prev else 3,
+            **probe,
+        }
+        return key, meta
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    workers = min(8, max(2, (total // 20) or 2))
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = [ex.submit(_one, f) for f in unique]
+        for fut in as_completed(futs):
+            key, meta = fut.result()
+            new_clips[key] = meta
+            done += 1
+            if progress_cb and done % 10 == 0:
+                progress_cb(done, total)
 
     lib.clips = new_clips
     lib.last_scan_at = _now()
