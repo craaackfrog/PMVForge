@@ -107,6 +107,34 @@ def _poster(raw: dict) -> str:
     return ""
 
 
+
+def _trailer(raw: dict) -> str:
+    """Extract trailer/stream URL if ThePornDB provides one."""
+    for key in ("trailer", "trailer_url", "preview", "video", "media"):
+        v = raw.get(key)
+        if isinstance(v, str) and v.startswith("http"):
+            return v
+        if isinstance(v, dict):
+            for kk in ("url", "full", "high", "medium", "low", "src"):
+                u = v.get(kk)
+                if isinstance(u, str) and u.startswith("http"):
+                    return u
+        if isinstance(v, list):
+            for item in v:
+                if isinstance(item, str) and item.startswith("http"):
+                    return item
+                if isinstance(item, dict):
+                    u = item.get("url") or item.get("src") or ""
+                    if isinstance(u, str) and u.startswith("http"):
+                        return u
+    # nested extras
+    extras = raw.get("extras") if isinstance(raw.get("extras"), dict) else {}
+    for key in ("trailer", "trailer_url"):
+        v = extras.get(key)
+        if isinstance(v, str) and v.startswith("http"):
+            return v
+    return ""
+
 def normalize_scene(raw: dict, kind: str = "scene") -> dict:
     performers = _performer_entries(raw)
     tags = []
@@ -127,6 +155,7 @@ def normalize_scene(raw: dict, kind: str = "scene") -> dict:
         "duration": raw.get("duration") or 0,
         "url": raw.get("url") or "",
         "poster": _poster(raw),
+        "trailer": _trailer(raw),
         "performers": performers,
         "performers_female": _female_only(performers),
         "tags": tags,

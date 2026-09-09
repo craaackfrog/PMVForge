@@ -248,8 +248,20 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
               <p className="text-sm text-muted-foreground py-8 text-center">Select a result to preview details.</p>
             ) : (
               <>
-                {selected.poster && (
-                  <img src={selected.poster} alt="" className="w-full max-h-48 object-contain rounded-md bg-black" />
+                {selected.trailer ? (
+                  <video
+                    key={selected.trailer}
+                    src={selected.trailer}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    poster={selected.poster || undefined}
+                    className="w-full max-h-auto rounded-md bg-black"
+                  />
+                ) : selected.poster ? (
+                  <img src={selected.poster} alt="" className="w-full max-h-auto object-contain rounded-md bg-black" />
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">No trailer URL from ThePornDB for this match.</p>
                 )}
                 <div>
                   <h3 className="font-serif text-xl leading-tight">{selected.title}</h3>
