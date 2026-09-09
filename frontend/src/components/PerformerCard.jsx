@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Loader2, RefreshCw, User, Star } from 'lucide-react'
+import { Loader2, RefreshCw, User, Star, ChevronLeft, ChevronRight } from 'lucide-react'
 import { playTap, playError, playClick } from '../lib/sounds'
 import ImageModal from './ImageModal'
 
@@ -76,6 +76,7 @@ export default function PerformerCard({ libraryId }) {
     return paths.map(imageUrl).filter(Boolean)
   }, [profile])
 
+
   async function refresh() {
     if (!libraryId) return
     playTap()
@@ -101,6 +102,7 @@ export default function PerformerCard({ libraryId }) {
   const place = extras.birthplace || extras.country || extras.nationality || null
   const flag = flagFor(extras.country || extras.nationality || extras.birthplace)
   const rating = profile?.rating != null && profile.rating !== '' ? Number(profile.rating) : null
+
   const current = gallery.length ? gallery[slide % gallery.length] : null
 
   return (
@@ -111,50 +113,57 @@ export default function PerformerCard({ libraryId }) {
             <Loader2 size={22} className="animate-spin text-muted-foreground" />
           </div>
         ) : current ? (
-          <button
-            type="button"
-            onClick={() => {
-              playClick()
-              setModalOpen(true)
-            }}
-            className="absolute inset-0 w-full h-full cursor-zoom-in"
-            title="View gallery"
-          >
-            <img
-              src={current}
-              alt={profile?.name || ''}
-              className="w-full h-full object-cover object-center"
-            />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                playClick()
+                setModalOpen(true)
+              }}
+              className="absolute inset-0 w-full h-full cursor-zoom-in"
+              title="View gallery"
+            >
+              <img
+                src={current}
+                alt={profile?.name || ''}
+                className="w-full h-full object-cover object-center"
+              />
+            </button>
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    playTap()
+                    setSlide((s) => (s - 1 + gallery.length) % gallery.length)
+                  }}
+                  className="absolute left-1.5 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    playTap()
+                    setSlide((s) => (s + 1) % gallery.length)
+                  }}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70"
+                  aria-label="Next photo"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </>
+            )}
+          </>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             <User size={40} className="text-muted-foreground opacity-40" />
           </div>
         )}
       </div>
-
-      {gallery.length > 1 && (
-        <div className="flex justify-center gap-1.5 py-2 bg-card">
-          {gallery.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Photo ${i + 1}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                playTap()
-                setSlide(i)
-              }}
-              className={
-                i === slide % gallery.length
-                  ? 'w-2 h-2 rounded-full bg-foreground'
-                  : 'w-2 h-2 rounded-full bg-muted-foreground/40 hover:bg-muted-foreground/70'
-              }
-            />
-          ))}
-        </div>
-      )}
-
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -185,11 +194,7 @@ export default function PerformerCard({ libraryId }) {
           {race && <span>{race}</span>}
           {(place || flag) && (
             <span className="inline-flex items-center gap-1">
-              {flag && (
-                <span className="flag-emoji text-sm leading-none" aria-hidden>
-                  {flag}
-                </span>
-              )}
+              {flag && <span aria-hidden>{flag}</span>}
               {place && <span>{place}</span>}
             </span>
           )}

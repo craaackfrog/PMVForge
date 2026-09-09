@@ -15,7 +15,8 @@ if (typeof window !== 'undefined') {
 const EXIT_MS = 220
 
 /**
- * Lightbox for performer gallery — image keeps its native aspect ratio.
+ * Lightbox for performer gallery — image keeps its natural size/ratio
+ * (only soft-capped so it cannot overflow the viewport).
  */
 export default function ImageModal({ images, index = 0, title, onClose }) {
   const [visible, setVisible] = useState(false)
@@ -75,7 +76,7 @@ export default function ImageModal({ images, index = 0, title, onClose }) {
         onClick={requestClose}
       />
       <div
-        className="relative z-10 max-w-[min(96vw,56rem)] max-h-[90vh] rounded-lg border border-border bg-card shadow-2xl overflow-hidden transition-[opacity,transform] ease-out flex flex-col"
+        className="relative z-10 inline-flex flex-col rounded-lg border border-border bg-card shadow-2xl overflow-hidden transition-[opacity,transform] ease-out max-w-[96vw] max-h-[92vh]"
         style={{
           transformOrigin: originCss,
           opacity: open ? 1 : 0,
@@ -97,13 +98,11 @@ export default function ImageModal({ images, index = 0, title, onClose }) {
             <X size={18} />
           </button>
         </div>
-        <div className="relative bg-black flex items-center justify-center p-2 min-h-0 flex-1 overflow-auto">
-          {/* Native aspect: no forced box; constrained only by viewport */}
+        <div className="relative bg-black flex items-center justify-center">
           <img
             src={src}
             alt=""
-            className="block w-auto h-auto max-w-[min(94vw,54rem)] max-h-[calc(90vh-4rem)]"
-            style={{ objectFit: 'none' }}
+            className="block w-auto h-auto max-w-[96vw] max-h-[calc(92vh-3.5rem)]"
           />
           {list.length > 1 && (
             <>
