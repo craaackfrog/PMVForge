@@ -2,8 +2,12 @@ import { NumberField, TextField, Toggle } from '../form'
 
 export default function OptionsSection({ form, update, clipMode }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-6 space-y-5">
-      <h2 className="font-serif text-lg">Options</h2>
+    <details className="rounded-lg border border-border bg-card group" open>
+      <summary className="cursor-pointer select-none list-none px-6 py-4 font-serif text-lg flex items-center justify-between gap-2">
+        <span>Options</span>
+        <span className="text-muted-foreground text-sm font-sans group-open:rotate-180 transition-transform">▾</span>
+      </summary>
+      <div className="px-6 pb-6 space-y-4 border-t border-border pt-4">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <NumberField label="Clip distance (s)" value={form.clip_dist} step={0.05} min={0.1} onChange={(v) => update('clip_dist', v, { silent: true })} />
         <NumberField label="FPS" value={form.fps} step={1} min={15} max={60} onChange={(v) => update('fps', v, { silent: true })} />
@@ -16,6 +20,7 @@ export default function OptionsSection({ form, update, clipMode }) {
         <Toggle label="GPU (CUDA / NVENC)" checked={form.cuda} onChange={(v) => update('cuda', v)} />
         <Toggle label="Debug" checked={form.debug} onChange={(v) => update('debug', v)} />
       </div>
-    </section>
+    </div>
+    </details>
   )
 }

@@ -102,3 +102,5 @@ main {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
+summary::-webkit-details-marker { display: none; }
+summary { list-style: none; }

@@ -5,8 +5,12 @@ import { QUALITY_LABELS, RES_HINT } from './defaults'
 
 export default function FormatSection({ form, update, resHint }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-6 space-y-4">
-      <h2 className="font-serif text-lg">Format</h2>
+    <details className="rounded-lg border border-border bg-card group" open>
+      <summary className="cursor-pointer select-none list-none px-6 py-4 font-serif text-lg flex items-center justify-between gap-2">
+        <span>Format</span>
+        <span className="text-muted-foreground text-sm font-sans group-open:rotate-180 transition-transform">▾</span>
+      </summary>
+      <div className="px-6 pb-6 space-y-4 border-t border-border pt-4">
       <div className="flex flex-wrap items-start gap-8">
         <div>
           <label className="block text-sm text-muted-foreground mb-2">Aspect ratio</label>
@@ -54,6 +58,7 @@ export default function FormatSection({ form, update, resHint }) {
           Sticky / Chronological avoid mixing the end of a scene with its beginning.
         </p>
       </div>
-    </section>
+    </div>
+    </details>
   )
 }

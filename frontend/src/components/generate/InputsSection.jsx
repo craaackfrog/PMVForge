@@ -12,8 +12,12 @@ export default function InputsSection({
   browseBeat, browseSong, browseVideoFolder, browseClips, browseOutput,
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-6 space-y-5">
-      <h2 className="font-serif text-lg">Inputs</h2>
+    <details className="rounded-lg border border-border bg-card group" open>
+      <summary className="cursor-pointer select-none list-none px-6 py-4 font-serif text-lg flex items-center justify-between gap-2">
+        <span>Inputs</span>
+        <span className="text-muted-foreground text-sm font-sans group-open:rotate-180 transition-transform">▾</span>
+      </summary>
+      <div className="px-6 pb-6 space-y-4 border-t border-border pt-4">
       <PathRow label="Beatmap" value={beatPath} placeholder="Select a .osu / .txt / .json…" onBrowse={browseBeat} onClear={() => setBeatPath('')} busy={picking === 'beat'} icon={Music2} />
       <PathRow label="Song override (optional)" value={songPath} placeholder="Only if audio isn’t next to the beatmap…" onBrowse={browseSong} onClear={() => setSongPath('')} busy={picking === 'song'} icon={FileAudio} />
 
@@ -132,6 +136,7 @@ export default function InputsSection({
       </div>
 
       <PathRow label="Output folder (optional)" value={outputFolder} placeholder="Leave empty → temp outputs…" onBrowse={browseOutput} onClear={() => setOutputFolder('')} busy={picking === 'out'} icon={FolderOpen} />
-    </section>
+    </div>
+    </details>
   )
 }

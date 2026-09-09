@@ -3,15 +3,19 @@ import { Toggle, NumberField } from '../form'
 export default function EffectsSection({ form, updateEffect, previewSlot }) {
   const fx = form.effects || {}
   return (
-    <section className="rounded-lg border border-border bg-card p-5 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-serif text-lg">Beat effects</h2>
-        <Toggle
-          label="Enable post-pass"
-          checked={!!fx.enabled}
-          onChange={(v) => updateEffect('enabled', v)}
-        />
-      </div>
+    <details className="rounded-lg border border-border bg-card group" open>
+      <summary className="cursor-pointer select-none list-none px-5 py-4 flex items-center justify-between gap-3">
+        <span className="font-serif text-lg">Beat effects</span>
+        <span className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+          <Toggle
+            label="Enable post-pass"
+            checked={!!fx.enabled}
+            onChange={(v) => updateEffect('enabled', v)}
+          />
+          <span className="text-muted-foreground text-sm group-open:rotate-180 transition-transform">▾</span>
+        </span>
+      </summary>
+      <div className="px-5 pb-5 space-y-4 border-t border-border pt-4">
       <p className="text-xs text-muted-foreground">
         Applied after the PMV is built, timed to beatmap hits. Flash/strobe can trigger photosensitive reactions — leave it off unless you know you want it.
       </p>
@@ -57,6 +61,7 @@ export default function EffectsSection({ form, updateEffect, previewSlot }) {
           {previewSlot}
         </div>
       )}
-    </section>
+    </div>
+    </details>
   )
 }
