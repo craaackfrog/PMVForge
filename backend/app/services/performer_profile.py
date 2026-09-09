@@ -18,6 +18,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -171,6 +172,7 @@ def _save_cache(key: str, data: dict, image_url: Optional[str], token: Optional[
         "query": data.get("query") or data.get("name") or "",
         "extras": dict(data.get("extras") or {}),
         "rating": data.get("rating"),
+        "age": data.get("age"),
         "source": "theporndb",
         "image_url": (urls[0] if urls else "") or image_url or data.get("image_url") or "",
         "image_urls": urls,
@@ -221,6 +223,41 @@ def _collect_image_urls(raw: dict) -> List[str]:
     return urls
 
 
+
+def _parse_birthday(val) -> Optional[str]:
+    if not val:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    # YYYY-MM-DD or YYYY
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%Y"):
+        try:
+            dt = datetime.strptime(s[:10] if fmt != "%Y" else s[:4], fmt)
+            if fmt == "%Y":
+                return f"{dt.year:04d}-01-01"
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+
+def _age_from_birthday(bday: Optional[str]) -> Optional[int]:
+    if not bday:
+        return None
+    try:
+        y, m, d = [int(x) for x in bday.split("-")[:3]]
+        born = date(y, m if m else 1, d if d else 1)
+    except Exception:
+        return None
+    today = date.today()
+    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    if age < 18 or age > 100:
+        # still show if plausible adult range; clamp weird parses
+        if age < 0 or age > 120:
+            return None
+    return age
+
 def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
     extras = raw.get("extras") if isinstance(raw.get("extras"), dict) else {}
     image_urls = _collect_image_urls(raw)
@@ -234,11 +271,21 @@ def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
         rating = float(rating) if rating is not None and rating != "" else None
     except (TypeError, ValueError):
         rating = None
-    # Keep only display-relevant extras (race + place); measurements intentionally omitted
+    # Display-relevant extras only (no measurements). Birthday drives age.
     slim_extras = {}
-    for k in ("ethnicity", "country", "birthplace", "nationality"):
+    for k in ("ethnicity", "country", "birthplace", "nationality", "birthday"):
         if extras.get(k):
             slim_extras[k] = extras.get(k)
+    # Top-level birthday sometimes appears outside extras
+    bday = _parse_birthday(
+        extras.get("birthday")
+        or raw.get("birthday")
+        or raw.get("date_of_birth")
+        or extras.get("date_of_birth")
+    )
+    if bday:
+        slim_extras["birthday"] = bday
+    age = _age_from_birthday(bday)
     return {
         "name": raw.get("name") or raw.get("full_name") or query,
         "bio": (bio or "").strip(),
@@ -246,6 +293,7 @@ def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
         "tpdb_id": raw.get("_id") or raw.get("id") or raw.get("slug"),
         "query": query,
         "rating": rating,
+        "age": age,
         "extras": slim_extras,
         "image_url": image,
         "image_urls": image_urls,
