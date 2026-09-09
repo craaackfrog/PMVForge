@@ -179,6 +179,27 @@ export default function SongLibrariesPage() {
 
       <div className="grid lg:grid-cols-[240px_1fr] gap-4 items-start">
         <aside className="rounded-lg border border-border bg-card p-2 space-y-1">
+          <div className="flex items-center gap-1 px-1 mb-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground flex-1">Folders</p>
+            <button
+              type="button"
+              title="Rescan library"
+              onClick={rescan}
+              disabled={!activeId || scanning}
+              className="p-1.5 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 transition-colors"
+            >
+              {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            </button>
+            <button
+              type="button"
+              title="Remove library"
+              onClick={removeLibrary}
+              disabled={!activeId}
+              className="p-1.5 rounded-md text-muted-foreground hover:bg-secondary hover:text-destructive disabled:opacity-30 transition-colors"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
           {loading && (
             <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
               <Loader2 size={14} className="animate-spin" /> Loading…
@@ -216,25 +237,6 @@ export default function SongLibrariesPage() {
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-serif text-lg truncate">{active?.name}</h2>
-                  <p className="text-xs text-muted-foreground font-mono truncate" title={active?.root_path}>
-                    {active?.root_path}
-                  </p>
-                </div>
-                <button type="button" onClick={rescan} disabled={scanning}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent disabled:opacity-50">
-                  {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  Rescan
-                </button>
-                <button type="button" onClick={removeLibrary}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm text-destructive hover:bg-accent">
-                  <Trash2 size={14} />
-                  Remove
-                </button>
-              </div>
-
               <div className="flex flex-wrap items-center gap-2">
                 <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Filter songs…"

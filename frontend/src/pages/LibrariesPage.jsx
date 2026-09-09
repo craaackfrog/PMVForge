@@ -335,7 +335,27 @@ export default function LibrariesPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-[200px_minmax(0,1fr)_220px] gap-4 items-start">
         <aside className="rounded-lg border border-border bg-card p-3 space-y-1.5">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground px-1 mb-2">Folders</p>
+          <div className="flex items-center gap-1 px-1 mb-2">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground flex-1">Folders</p>
+            <button
+              type="button"
+              title="Rescan library"
+              onClick={rescan}
+              disabled={!activeId || scanning}
+              className="p-1.5 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 transition-colors"
+            >
+              {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            </button>
+            <button
+              type="button"
+              title="Remove library"
+              onClick={removeLibrary}
+              disabled={!activeId}
+              className="p-1.5 rounded-md text-muted-foreground hover:bg-secondary hover:text-destructive disabled:opacity-30 transition-colors"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
           {libraries.length === 0 && (
             <p className="text-sm text-muted-foreground px-1 py-3">No libraries yet. Hit Add folder.</p>
           )}
@@ -369,32 +389,6 @@ export default function LibrariesPage() {
             </div>
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-serif text-lg truncate">{active?.name}</h2>
-                  <p className="text-xs text-muted-foreground font-mono truncate" title={active?.root_path}>
-                    {active?.root_path}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={rescan}
-                  disabled={scanning}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent disabled:opacity-50"
-                >
-                  {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  Rescan
-                </button>
-                <button
-                  type="button"
-                  onClick={removeLibrary}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-secondary text-sm text-destructive hover:bg-accent"
-                >
-                  <Trash2 size={14} />
-                  Remove
-                </button>
-              </div>
-
               <div className="rounded-lg border border-border bg-card p-3 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Tag size={14} className="text-muted-foreground" />
@@ -596,50 +590,58 @@ export default function LibrariesPage() {
           )}
         </section>
 
-        <aside className="rounded-lg border border-border bg-card p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Tag size={15} />
-            <h3 className="font-serif text-base">Tags</h3>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Create custom tags here. Click a chip under any clip to apply it.
-          </p>
-          <div className="flex gap-1.5">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && createTag()}
-              placeholder="New tag…"
-              className="flex-1 min-w-0 px-2 py-1.5 rounded-md bg-secondary border border-border text-sm"
-            />
-            <button
-              type="button"
-              onClick={createTag}
-              disabled={!newTag.trim()}
-              className="px-2.5 rounded-md bg-primary text-primary-foreground disabled:opacity-40"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-          <ul className="space-y-1 max-h-[50vh] overflow-y-auto">
-            {vocab.map((tag) => (
-              <li
-                key={tag}
-                className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/60 text-sm group"
-              >
-                <span className="truncate">{tag}</span>
+        <aside className="space-y-3">
+          {/* Slot reserved for actress profile (pic + info) — future */}
+          <details className="rounded-lg border border-border bg-card group/tags" open>
+            <summary className="cursor-pointer select-none list-none px-4 py-3 flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-2 font-serif text-base">
+                <Tag size={15} />
+                Tags
+              </span>
+              <span className="text-muted-foreground text-sm transition-transform group-open/tags:rotate-180">▾</span>
+            </summary>
+            <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Create custom tags here. Click a chip under any clip to apply it.
+              </p>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && createTag()}
+                  placeholder="New tag…"
+                  className="flex-1 min-w-0 px-2 py-1.5 rounded-md bg-secondary border border-border text-sm"
+                />
                 <button
                   type="button"
-                  title="Delete tag"
-                  onClick={() => deleteTag(tag)}
-                  className="opacity-40 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive"
+                  onClick={createTag}
+                  disabled={!newTag.trim()}
+                  className="px-2.5 rounded-md bg-primary text-primary-foreground disabled:opacity-40"
                 >
-                  <X size={13} />
+                  <Plus size={16} />
                 </button>
-              </li>
-            ))}
-          </ul>
+              </div>
+              <ul className="space-y-1 max-h-[40vh] overflow-y-auto">
+                {vocab.map((tag) => (
+                  <li
+                    key={tag}
+                    className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-secondary/60 text-sm group"
+                  >
+                    <span className="truncate">{tag}</span>
+                    <button
+                      type="button"
+                      title="Delete tag"
+                      onClick={() => deleteTag(tag)}
+                      className="opacity-40 group-hover:opacity-100 p-1 rounded text-muted-foreground hover:text-destructive"
+                    >
+                      <X size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </details>
         </aside>
       </div>
 
