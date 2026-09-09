@@ -612,7 +612,7 @@ export default function LibrariesPage() {
 
         <aside className="space-y-3">
           {activeId && <PerformerCard libraryId={activeId} />}
-          <details className="rounded-lg border border-border bg-card group/tags" open>
+          <details className="rounded-lg border border-border bg-card group/tags">
             <summary className="cursor-pointer select-none list-none px-4 py-3 flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 font-serif text-base">
                 <Tag size={15} />
