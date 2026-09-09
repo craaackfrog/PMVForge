@@ -17,6 +17,7 @@ import { DEFAULTS, RES_HINT } from '../components/generate/defaults'
 import InputsSection from '../components/generate/InputsSection'
 import FormatSection from '../components/generate/FormatSection'
 import EffectsSection from '../components/generate/EffectsSection'
+import EffectsPreview from '../components/generate/EffectsPreview'
 import OptionsSection from '../components/generate/OptionsSection'
 
 export default function GeneratePage() {
@@ -388,7 +389,20 @@ export default function GeneratePage() {
       />
 
       <FormatSection form={form} update={update} resHint={resHint} />
-      <EffectsSection form={form} updateEffect={updateEffect} />
+      <EffectsSection
+        form={form}
+        updateEffect={updateEffect}
+        previewSlot={
+          <EffectsPreview
+            effects={form.effects}
+            clipPath={videoPaths[0] || ''}
+            videoPaths={videoPaths}
+            videoFolder={videoFolder}
+            cuda={form.cuda}
+            bitrate={form.bitrate}
+          />
+        }
+      />
       <OptionsSection form={form} update={update} clipMode={clipMode} />
 
       <div className="flex items-center gap-4">

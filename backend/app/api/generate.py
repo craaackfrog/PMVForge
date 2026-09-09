@@ -150,6 +150,81 @@ def _queue_job(options: PMVJobOptions, background_tasks: BackgroundTasks, extra:
     return job
 
 
+
+class EffectsPreviewRequest(BaseModel):
+    clip_path: str
+    effects: dict
+    duration: float = 4.0
+    cuda: bool = False
+    bitrate: Optional[str] = None
+
+
+@router.post("/effects-preview")
+async def effects_preview(body: EffectsPreviewRequest):
+    """Render a short effects preview from one source clip + synthetic beats."""
+    clip = Path(body.clip_path)
+    if not clip.is_file():
+        raise HTTPException(400, f"Clip not found: {body.clip_path}")
+    from ..services.effects_pipeline import EffectsOptions, apply_effects
+    from ..config import get_temp_dir
+    import random, time as _time
+
+    work = get_temp_dir() / "fx_preview" / str(int(_time.time() * 1000))
+    work.mkdir(parents=True, exist_ok=True)
+    # cut a short segment from a random offset near the start/middle
+    dur = max(1.5, min(8.0, float(body.duration or 4.0)))
+    cut = work / "cut.mp4"
+    # random start 0..10s
+    ss = random.uniform(0.0, 8.0)
+    code_cut = __import__("subprocess").run(
+        [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-ss", f"{ss:.2f}", "-i", str(clip), "-t", f"{dur:.2f}",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+            "-an", str(cut),
+        ],
+        capture_output=True, timeout=120,
+    )
+    if code_cut.returncode != 0 or not cut.exists():
+        raise HTTPException(500, "Failed to cut preview clip")
+
+    # synthetic beats every 0.4s across the cut
+    beats = [i * 0.4 for i in range(int(dur / 0.4) + 2)]
+    fx_raw = body.effects or {}
+    fx = EffectsOptions(
+        enabled=True,
+        soft_pulse=bool(fx_raw.get("soft_pulse", True)),
+        soft_pulse_strength=float(fx_raw.get("soft_pulse_strength", 0.12)),
+        soft_pulse_ms=float(fx_raw.get("soft_pulse_ms", 80)),
+        flash=bool(fx_raw.get("flash", False)),
+        flash_strength=float(fx_raw.get("flash_strength", 0.55)),
+        flash_ms=float(fx_raw.get("flash_ms", 40)),
+        flash_max_per_sec=float(fx_raw.get("flash_max_per_sec", 8)),
+        zoom_punch=bool(fx_raw.get("zoom_punch", True)),
+        zoom_punch_amount=float(fx_raw.get("zoom_punch_amount", 1.06)),
+        zoom_punch_ms=float(fx_raw.get("zoom_punch_ms", 100)),
+        rgb_split=bool(fx_raw.get("rgb_split", False)),
+        rgb_split_px=float(fx_raw.get("rgb_split_px", 4)),
+        rgb_split_ms=float(fx_raw.get("rgb_split_ms", 70)),
+        pink_glow=bool(fx_raw.get("pink_glow", False)),
+        pink_glow_strength=float(fx_raw.get("pink_glow_strength", 0.35)),
+        pink_glow_saturation=float(fx_raw.get("pink_glow_saturation", 1.15)),
+    )
+    out = work / "preview.mp4"
+    try:
+        apply_effects(
+            str(cut), str(out), beats, fx,
+            cuda=bool(body.cuda),
+            bitrate=body.bitrate or "8M",
+            work_dir=str(work),
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Preview failed: {e}")
+    if not out.exists():
+        raise HTTPException(500, "Preview produced no file")
+    return FileResponse(str(out), media_type="video/mp4", filename="effects-preview.mp4")
+
+
 @router.get("/presets")
 async def list_presets():
     return {
