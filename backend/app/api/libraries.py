@@ -140,6 +140,50 @@ async def clip_thumbnail(path: str = Query(..., description="Absolute path to a 
     return FileResponse(str(out), media_type="image/jpeg", filename=out.name)
 
 
+
+
+
+@router.get("/performer-image")
+async def performer_image(path: str = Query(..., description="Absolute path to cached or override image")):
+    from ..services import performer_profile as pp
+    if not path or not Path(path).is_file():
+        raise HTTPException(404, "Image not found")
+    if not pp.media_path_allowed(path):
+        raise HTTPException(403, "Path not allowed")
+    suffix = Path(path).suffix.lower()
+    media = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(suffix, "application/octet-stream")
+    return FileResponse(path, media_type=media, filename=Path(path).name)
+
+
+@router.get("/{lib_id}/performer")
+async def get_performer_profile(lib_id: str, refresh: bool = False):
+    """Cached ThePornDB / local override profile for a clip library."""
+    from ..services import performer_profile as pp
+    try:
+        return pp.get_profile_for_library(lib_id, force_refresh=bool(refresh))
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.post("/{lib_id}/performer/refresh")
+async def refresh_performer_profile(lib_id: str):
+    from ..services import performer_profile as pp
+    try:
+        return pp.get_profile_for_library(lib_id, force_refresh=True)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+
 @router.get("/{lib_id}")
 async def get_library(lib_id: str):
     lib = store.load_library(lib_id)

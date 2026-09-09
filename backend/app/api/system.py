@@ -43,6 +43,7 @@ class SettingsPatch(BaseModel):
     default_zoom_to_fill: Optional[bool] = None
     auto_cleanup_after_job: Optional[bool] = None
     cleanup_max_age_hours: Optional[float] = None
+    theporndb_api_token: Optional[str] = None
 
 
 @router.get("/info")

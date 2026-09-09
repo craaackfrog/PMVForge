@@ -38,6 +38,7 @@ const empty = {
   default_zoom_to_fill: true,
   auto_cleanup_after_job: true,
   cleanup_max_age_hours: 24,
+  theporndb_api_token: '',
 }
 
 export default function SettingsPage() {
@@ -371,6 +372,27 @@ export default function SettingsPage() {
             <RefreshCw size={14} />
             Refresh size
           </button>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <h2 className="font-serif text-lg">Metadata</h2>
+        <p className="text-xs text-muted-foreground">
+          ThePornDB token powers actress photos/info on Clip Libraries.
+          Get a free token at theporndb.net → user → API tokens.
+          Local override: put <code className="text-foreground">cover.jpg</code> and optional{' '}
+          <code className="text-foreground">info.json</code> in the library folder.
+        </p>
+        <div>
+          <label className="block text-sm text-muted-foreground mb-1.5">ThePornDB API token</label>
+          <input
+            type="password"
+            value={form.theporndb_api_token || ''}
+            onChange={(e) => update('theporndb_api_token', e.target.value)}
+            placeholder="Bearer token…"
+            className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+            autoComplete="off"
+          />
         </div>
       </section>
 

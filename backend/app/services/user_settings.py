@@ -34,6 +34,7 @@ DEFAULTS: Dict[str, Any] = {
     "default_zoom_to_fill": True,
     "auto_cleanup_after_job": True,
     "cleanup_max_age_hours": 24.0,
+    "theporndb_api_token": "",
 }
 
 
@@ -49,7 +50,7 @@ def load_settings() -> Dict[str, Any]:
             saved = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(saved, dict):
                 data.update({k: v for k, v in saved.items() if k in DEFAULTS or k.startswith("default_") or k in (
-                    "temp_dir", "default_output_folder", "auto_cleanup_after_job", "cleanup_max_age_hours",
+                    "temp_dir", "default_output_folder", "auto_cleanup_after_job", "cleanup_max_age_hours", "theporndb_api_token",
                 )})
         except Exception:
             pass

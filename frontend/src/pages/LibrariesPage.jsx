@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { playClick, playTap, playDone, playError } from '../lib/sounds'
 import VideoModal from '../components/VideoModal'
+import PerformerCard from '../components/PerformerCard'
 import { nativePick } from '../lib/nativePick'
 import { cn } from '../lib/utils'
 
@@ -591,7 +592,7 @@ export default function LibrariesPage() {
         </section>
 
         <aside className="space-y-3">
-          {/* Slot reserved for actress profile (pic + info) — future */}
+          {activeId && <PerformerCard libraryId={activeId} />}
           <details className="rounded-lg border border-border bg-card group/tags" open>
             <summary className="cursor-pointer select-none list-none px-4 py-3 flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-2 font-serif text-base">
