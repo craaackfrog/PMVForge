@@ -120,23 +120,83 @@ def _ffmpeg_static_pass(src: str, dst: str, vf: str, cuda: bool, bitrate: str) -
         if code != 0:
             raise RuntimeError(f"copy failed: {out[-300:]}")
         return
-    if cuda:
-        cmd = [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", src, "-vf", vf,
-            "-c:v", "h264_nvenc", "-b:v", bitrate,
-            "-c:a", "copy", "-movflags", "+faststart", dst,
-        ]
-    else:
-        cmd = [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", src, "-vf", vf,
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-            "-c:a", "copy", "-movflags", "+faststart", dst,
-        ]
+    br = _resolve_bitrate(bitrate, src)
+    cmd = [
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-i", src, "-vf", vf,
+        *_video_encode_args(cuda, br),
+        "-c:a", "copy", "-movflags", "+faststart", dst,
+    ]
     code, out = _run(cmd, timeout=7200)
     if code != 0 or not Path(dst).exists():
         raise RuntimeError(f"static effects failed: {out[-500:]}")
+
+
+def _probe_bitrate(path: str) -> Optional[str]:
+    """Return a ffmpeg -b:v style string from the source stream, or None."""
+    code, out = _run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=bit_rate:format=bit_rate",
+        "-of", "json", path,
+    ], timeout=30)
+    if code != 0:
+        return None
+    try:
+        data = json.loads(out)
+        br = None
+        if data.get("streams"):
+            br = data["streams"][0].get("bit_rate")
+        if not br or br in ("N/A", "0"):
+            br = (data.get("format") or {}).get("bit_rate")
+        if not br or br in ("N/A", "0"):
+            return None
+        bps = int(float(br))
+        if bps <= 0:
+            return None
+        # express as k or M for ffmpeg
+        if bps >= 1_000_000:
+            return f"{max(1, int(round(bps / 1_000_000)))}M"
+        return f"{max(100, int(round(bps / 1000)))}k"
+    except Exception:
+        return None
+
+
+def _resolve_bitrate(requested: str, src: str) -> str:
+    """Prefer explicit request; otherwise keep source bitrate; floor at 8M for quality."""
+    req = (requested or "").strip()
+    src_br = _probe_bitrate(src)
+    if req:
+        return req
+    if src_br:
+        return src_br
+    return "12M"
+
+
+def _video_encode_args(cuda: bool, bitrate: str) -> list:
+    """High-quality encode args that honor bitrate (no destructive CRF defaults)."""
+    if cuda:
+        return [
+            "-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr",
+            "-b:v", bitrate, "-maxrate", bitrate, "-bufsize", _bufsize(bitrate),
+            "-pix_fmt", "yuv420p",
+        ]
+    return [
+        "-c:v", "libx264", "-preset", "medium", "-b:v", bitrate,
+        "-maxrate", bitrate, "-bufsize", _bufsize(bitrate),
+        "-pix_fmt", "yuv420p",
+    ]
+
+
+def _bufsize(bitrate: str) -> str:
+    s = bitrate.strip().lower()
+    try:
+        if s.endswith("m"):
+            return f"{max(1, int(float(s[:-1]) * 2))}M"
+        if s.endswith("k"):
+            return f"{max(100, int(float(s[:-1]) * 2))}k"
+    except Exception:
+        pass
+    return "16M"
 
 
 def _probe(path: str) -> Tuple[int, int, float]:
@@ -206,24 +266,15 @@ def _apply_timed_frames(
         stderr=subprocess.PIPE,
     )
     raw_out = Path(dst).with_suffix(".timed.mp4")
-    encoder = "h264_nvenc" if cuda else "libx264"
+    br = _resolve_bitrate(bitrate, src)
     enc_cmd = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-f", "rawvideo", "-pix_fmt", "rgb24",
         "-s", f"{w}x{h}", "-r", f"{fps}",
         "-i", "-",
-        "-c:v", encoder, "-pix_fmt", "yuv420p",
+        *_video_encode_args(cuda, br),
         "-an", str(raw_out),
     ]
-    if not cuda:
-        enc_cmd = [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "rawvideo", "-pix_fmt", "rgb24",
-            "-s", f"{w}x{h}", "-r", f"{fps}",
-            "-i", "-",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-            "-pix_fmt", "yuv420p", "-an", str(raw_out),
-        ]
     enc = subprocess.Popen(enc_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
 
     frame_size = w * h * 3
