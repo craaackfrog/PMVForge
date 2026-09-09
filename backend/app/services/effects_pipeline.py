@@ -241,6 +241,7 @@ def _apply_timed_frames(
     *,
     cuda: bool,
     bitrate: str,
+    progress_cb=None,
 ) -> None:
     w, h, fps = _probe(src)
     pulse_beats = _thin_beats(beats, 6.0)
@@ -281,6 +282,18 @@ def _apply_timed_frames(
     frame_i = 0
     assert dec.stdout is not None and enc.stdin is not None
 
+    # estimate total frames from duration for progress
+    total_frames = None
+    try:
+        code_d, out_d = _run([
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", src,
+        ], timeout=20)
+        if code_d == 0 and out_d.strip():
+            total_frames = max(1, int(float(out_d.strip()) * fps))
+    except Exception:
+        total_frames = None
+
     while True:
         buf = dec.stdout.read(frame_size)
         if not buf or len(buf) < frame_size:
@@ -317,6 +330,11 @@ def _apply_timed_frames(
         except BrokenPipeError:
             break
         frame_i += 1
+        if progress_cb and total_frames and frame_i % max(1, total_frames // 50) == 0:
+            try:
+                progress_cb(min(0.99, frame_i / total_frames))
+            except Exception:
+                pass
 
     dec.stdout.close()
     enc.stdin.close()
@@ -355,6 +373,7 @@ def apply_effects(
     cuda: bool = False,
     bitrate: str = "6M",
     work_dir: Optional[str] = None,
+    progress_cb=None,
 ) -> None:
     if not opts.enabled:
         if Path(input_video).resolve() != Path(output_video).resolve():
@@ -394,7 +413,14 @@ def apply_effects(
     # 2) timed beat effects
     if has_timed:
         timed_path = str(work / "fx_timed.mp4")
-        _apply_timed_frames(current, timed_path, beats, opts, cuda=cuda, bitrate=bitrate)
+        def _timed_progress(frac: float):
+            if progress_cb:
+                # map timed pass into outer 0..1
+                progress_cb(frac)
+        _apply_timed_frames(
+            current, timed_path, beats, opts, cuda=cuda, bitrate=bitrate,
+            progress_cb=_timed_progress if progress_cb else None,
+        )
         current = timed_path
 
     # move to output

@@ -700,7 +700,12 @@ class PMVGenerator:
             # Optional beat-effects post-pass
             fx_raw = opts.effects if isinstance(getattr(opts, "effects", None), dict) else {}
             if fx_raw and fx_raw.get("enabled"):
-                self._progress("Applying beat effects…", 0.9)
+                self._progress("Applying beat effects… 0%", 0.9)
+
+                def _fx_progress(frac: float):
+                    pct = int(round(frac * 100))
+                    self._progress(f"Applying beat effects… {pct}%", 0.9 + 0.08 * frac)
+
                 fx = EffectsOptions(
                     enabled=True,
                     soft_pulse=bool(fx_raw.get("soft_pulse", True)),
@@ -729,6 +734,7 @@ class PMVGenerator:
                     cuda=bool(opts.cuda),
                     bitrate=bitrate,
                     work_dir=str(work_dir),
+                    progress_cb=_fx_progress,
                 )
                 # replace final
                 import shutil
