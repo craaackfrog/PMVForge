@@ -466,7 +466,7 @@ export default function CockHeroPage() {
           ) : (
             <>
               <Heart size={16} />
-              Render Cock Hero
+              Create Cock Hero
             </>
           )}
         </button>

@@ -47,11 +47,6 @@ export default function GeneratePage() {
   const libraryTagMode = draft.libraryTagMode || 'any'
   const libraryMinHeat = draft.libraryMinHeat ?? 1
 
-
-
-
-
-
   const updateEffect = (key, value) => {
     setForm((f) => ({
       ...f,
@@ -406,13 +401,13 @@ export default function GeneratePage() {
       <OptionsSection form={form} update={update} clipMode={clipMode} />
 
       <div className="flex items-center gap-4">
-        <button type="button" onClick={saveProject} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm hover:bg-accent">
-          Save project
-        </button>
         <button onClick={() => { playTap(); startJob() }} disabled={submitting || isRunning || !canStart}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity">
-          {submitting || isRunning ? (<><Loader2 size={16} className="animate-spin" />{isRunning ? 'Generating…' : 'Starting…'}</>) : (<><Film size={16} />PMV Creator</>)}
+          {submitting || isRunning ? (<><Loader2 size={16} className="animate-spin" />{isRunning ? 'Generating…' : 'Starting…'}</>) : (<><Film size={16} />Create PMV</>)}
         </button>
+        {/* <button type="button" onClick={saveProject} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm hover:bg-accent">
+          Save project
+        </button> */}
         {isRunning && (
           <button type="button" onClick={cancelJob} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm text-destructive hover:bg-accent">
             Cancel
