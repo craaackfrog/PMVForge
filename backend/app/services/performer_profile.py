@@ -128,16 +128,28 @@ def _load_cache(key: str) -> Optional[dict]:
         return None
     if not isinstance(data, dict):
         return None
-    img = d / "image.jpg"
-    if not img.is_file():
-        # try other extensions
+    paths: List[str] = []
+    primary = d / "image.jpg"
+    if primary.is_file():
+        paths.append(str(primary.resolve()))
+    else:
         for ext in (".png", ".webp", ".jpeg"):
             alt = d / f"image{ext}"
             if alt.is_file():
-                img = alt
+                paths.append(str(alt.resolve()))
                 break
-    if img.is_file():
-        data["image_path"] = str(img.resolve())
+    # gallery frames image_1.jpg …
+    for i in range(1, 16):
+        f = d / f"image_{i}.jpg"
+        if f.is_file():
+            paths.append(str(f.resolve()))
+    # also accept image_0 if primary missing
+    z = d / "image_0.jpg"
+    if z.is_file() and str(z.resolve()) not in paths:
+        paths.insert(0, str(z.resolve()))
+    if paths:
+        data["image_path"] = paths[0]
+        data["image_paths"] = paths
     data["cached"] = True
     data["source"] = data.get("source") or "cache"
     data["override"] = False
@@ -146,6 +158,11 @@ def _load_cache(key: str) -> Optional[dict]:
 
 def _save_cache(key: str, data: dict, image_url: Optional[str], token: Optional[str]) -> dict:
     d = _cache_dir(key)
+    urls = list(data.get("image_urls") or [])
+    if image_url and image_url not in urls:
+        urls = [image_url] + urls
+    # Cap gallery size
+    urls = urls[:12]
     out = {
         "name": data.get("name") or "",
         "bio": data.get("bio") or "",
@@ -153,56 +170,85 @@ def _save_cache(key: str, data: dict, image_url: Optional[str], token: Optional[
         "tpdb_id": data.get("tpdb_id") or data.get("id"),
         "query": data.get("query") or data.get("name") or "",
         "extras": dict(data.get("extras") or {}),
+        "rating": data.get("rating"),
         "source": "theporndb",
-        "image_url": image_url or data.get("image_url") or "",
+        "image_url": (urls[0] if urls else "") or image_url or data.get("image_url") or "",
+        "image_urls": urls,
     }
-    img_path = d / "image.jpg"
-    if image_url:
-        if _download_image(image_url, img_path, token=token):
-            out["image_path"] = str(img_path.resolve())
+    image_paths: List[str] = []
+    for i, u in enumerate(urls):
+        dest = d / (f"image_{i}.jpg" if i else "image.jpg")
+        if _download_image(u, dest, token=token):
+            image_paths.append(str(dest.resolve()))
+    if image_paths:
+        out["image_path"] = image_paths[0]
+        out["image_paths"] = image_paths
     (d / "profile.json").write_text(json.dumps(out, indent=2), encoding="utf-8")
     out["cached"] = True
     out["override"] = False
     return out
 
 
+def _extract_url(val) -> str:
+    if not val:
+        return ""
+    if isinstance(val, dict):
+        return str(val.get("url") or val.get("full") or val.get("large") or val.get("medium") or "")
+    return str(val)
+
+
+def _collect_image_urls(raw: dict) -> List[str]:
+    """Primary + posters/face/thumbnail, de-duplicated, order preserved."""
+    urls: List[str] = []
+    seen = set()
+
+    def add(u: str):
+        u = (u or "").strip()
+        if not u or u in seen:
+            return
+        seen.add(u)
+        urls.append(u)
+
+    for key in ("image", "face", "thumbnail"):
+        add(_extract_url(raw.get(key)))
+    posters = raw.get("posters") or raw.get("images") or []
+    if isinstance(posters, dict):
+        for v in posters.values():
+            add(_extract_url(v))
+    elif isinstance(posters, list):
+        for p in posters:
+            add(_extract_url(p))
+    return urls
+
+
 def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
     extras = raw.get("extras") if isinstance(raw.get("extras"), dict) else {}
-    # some responses nest image differently
-    image = raw.get("image") or raw.get("thumbnail") or ""
-    if isinstance(image, dict):
-        image = image.get("url") or image.get("full") or image.get("large") or ""
+    image_urls = _collect_image_urls(raw)
+    image = image_urls[0] if image_urls else ""
     aliases = raw.get("aliases") or []
     if isinstance(aliases, str):
         aliases = [aliases]
     bio = raw.get("bio") or raw.get("description") or extras.get("biography") or ""
+    rating = raw.get("rating")
+    try:
+        rating = float(rating) if rating is not None and rating != "" else None
+    except (TypeError, ValueError):
+        rating = None
+    # Keep only display-relevant extras (race + place); measurements intentionally omitted
+    slim_extras = {}
+    for k in ("ethnicity", "country", "birthplace", "nationality"):
+        if extras.get(k):
+            slim_extras[k] = extras.get(k)
     return {
         "name": raw.get("name") or raw.get("full_name") or query,
         "bio": (bio or "").strip(),
         "aliases": list(aliases),
         "tpdb_id": raw.get("_id") or raw.get("id") or raw.get("slug"),
         "query": query,
-        "extras": {
-            k: extras.get(k)
-            for k in (
-                "gender",
-                "birthday",
-                "birthplace",
-                "ethnicity",
-                "country",
-                "height",
-                "measurements",
-                "cupsize",
-                "tattoos",
-                "piercings",
-                "hair_colour",
-                "eye_colour",
-                "career_start_year",
-                "career_end_year",
-            )
-            if extras.get(k)
-        },
+        "rating": rating,
+        "extras": slim_extras,
         "image_url": image,
+        "image_urls": image_urls,
         "source": "theporndb",
     }
 
