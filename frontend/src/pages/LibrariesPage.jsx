@@ -539,7 +539,7 @@ export default function LibrariesPage() {
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="text-sm font-medium truncate" title={clip.path}>
                             <span className="inline-flex items-center gap-2 min-w-0">
-                              <img src={thumbUrl(clip.path)} alt="" className="w-10 h-10 rounded object-cover bg-secondary shrink-0" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />
+                              <img src={thumbUrl(clip.path)} alt="" className="w-11 h-10 rounded object-cover bg-secondary shrink-0" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />
                               <span className="truncate">{clip.name || clip.path.split(/[/\\]/).pop()}</span>
                             </span>
                           </div>

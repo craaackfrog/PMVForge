@@ -1,7 +1,8 @@
-import { FolderOpen, Files, Library, Music2, FileAudio } from 'lucide-react'
+import { FolderOpen, Files, Library, FileAudio } from 'lucide-react'
 import { PathRow } from '../form'
 import { chipClass } from '../form'
 import { playClick } from '../../lib/sounds'
+import BeatmapLibraryPicker from './BeatmapLibraryPicker'
 
 export default function InputsSection({
   beatPath, songPath, clipMode, videoFolder, videoPaths, outputFolder,
@@ -9,7 +10,7 @@ export default function InputsSection({
   libraries, libTagVocab, libPreviewCount, picking,
   setBeatPath, setSongPath, setClipMode, setVideoFolder, setVideoPaths,
   setOutputFolder, setLibraryId, setLibraryTags, setLibraryTagMode, setLibraryMinHeat,
-  browseBeat, browseSong, browseVideoFolder, browseClips, browseOutput,
+  onSelectBeatmap, browseSong, browseVideoFolder, browseClips, browseOutput,
 }) {
   return (
     <details className="rounded-lg border border-border bg-card group" open>
@@ -18,8 +19,20 @@ export default function InputsSection({
         <span className="text-muted-foreground text-sm font-sans group-open:rotate-180 transition-transform">▾</span>
       </summary>
       <div className="px-6 pb-6 space-y-4 border-t border-border pt-4">
-      <PathRow label="Beatmap" value={beatPath} placeholder="Select a .osu / .txt / .json…" onBrowse={browseBeat} onClear={() => setBeatPath('')} busy={picking === 'beat'} icon={Music2} />
-      <PathRow label="Song override (optional)" value={songPath} placeholder="Only if audio isn’t next to the beatmap…" onBrowse={browseSong} onClear={() => setSongPath('')} busy={picking === 'song'} icon={FileAudio} />
+      <BeatmapLibraryPicker
+        beatPath={beatPath}
+        songPath={songPath}
+        onSelectBeatmap={onSelectBeatmap}
+      />
+      <PathRow
+        label="Song override (optional)"
+        value={songPath}
+        placeholder="Usually auto-filled from the map’s AudioFilename…"
+        onBrowse={browseSong}
+        onClear={() => setSongPath('')}
+        busy={picking === 'song'}
+        icon={FileAudio}
+      />
 
       <div>
         <label className="block text-sm text-muted-foreground mb-2">Source clips</label>

@@ -62,6 +62,14 @@ export default function GeneratePage() {
     }))
   const setBeatPath = (v) => setDraft((d) => ({ ...d, beatPath: v }))
   const setSongPath = (v) => setDraft((d) => ({ ...d, songPath: v }))
+  const onSelectBeatmap = (osuPath, audioPath) => {
+    setDraft((d) => ({
+      ...d,
+      beatPath: osuPath || '',
+      // auto-link mapped audio; clear if map has none
+      songPath: audioPath || '',
+    }))
+  }
   const setClipMode = (v) => setDraft((d) => ({ ...d, clipMode: v }))
   const setVideoFolder = (v) => setDraft((d) => ({ ...d, videoFolder: v }))
   const setVideoPaths = (v) => setDraft((d) => ({ ...d, videoPaths: v }))
@@ -376,7 +384,7 @@ export default function GeneratePage() {
         setLibraryTags={setLibraryTags}
         setLibraryTagMode={setLibraryTagMode}
         setLibraryMinHeat={setLibraryMinHeat}
-        browseBeat={browseBeat}
+        onSelectBeatmap={onSelectBeatmap}
         browseSong={browseSong}
         browseVideoFolder={browseVideoFolder}
         browseClips={browseClips}
