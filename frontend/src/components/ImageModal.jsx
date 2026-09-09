@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
-/** Last pointer position — transform origin when opening. */
 let lastPointer = { x: null, y: null }
 if (typeof window !== 'undefined') {
   window.addEventListener(
@@ -16,7 +15,7 @@ if (typeof window !== 'undefined') {
 const EXIT_MS = 220
 
 /**
- * Lightbox for performer gallery — same motion language as VideoModal.
+ * Lightbox for performer gallery — image keeps its native aspect ratio.
  */
 export default function ImageModal({ images, index = 0, title, onClose }) {
   const [visible, setVisible] = useState(false)
@@ -39,7 +38,7 @@ export default function ImageModal({ images, index = 0, title, onClose }) {
   }, [])
 
   useEffect(() => {
-    setIdx(Math.max(0, Math.min(index, list.length - 1)))
+    setIdx(Math.max(0, Math.min(index, Math.max(list.length - 1, 0))))
   }, [index, list.length])
 
   useEffect(() => {
@@ -76,7 +75,7 @@ export default function ImageModal({ images, index = 0, title, onClose }) {
         onClick={requestClose}
       />
       <div
-        className="relative z-10 w-full max-w-4xl rounded-lg border border-border bg-card shadow-2xl overflow-hidden transition-[opacity,transform] ease-out"
+        className="relative z-10 max-w-[min(96vw,56rem)] max-h-[90vh] rounded-lg border border-border bg-card shadow-2xl overflow-hidden transition-[opacity,transform] ease-out flex flex-col"
         style={{
           transformOrigin: originCss,
           opacity: open ? 1 : 0,
@@ -84,7 +83,7 @@ export default function ImageModal({ images, index = 0, title, onClose }) {
           transitionDuration: `${EXIT_MS}ms`,
         }}
       >
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border shrink-0">
           <p className="text-sm font-medium truncate">
             {title || 'Gallery'}
             {list.length > 1 ? ` · ${idx + 1}/${list.length}` : ''}
@@ -98,8 +97,14 @@ export default function ImageModal({ images, index = 0, title, onClose }) {
             <X size={18} />
           </button>
         </div>
-        <div className="relative bg-black flex items-center justify-center min-h-[40vh] max-h-[80vh]">
-          <img src={src} alt="" className="max-w-full max-h-[80vh] object-contain" />
+        <div className="relative bg-black flex items-center justify-center p-2 min-h-0 flex-1 overflow-auto">
+          {/* Native aspect: no forced box; constrained only by viewport */}
+          <img
+            src={src}
+            alt=""
+            className="block w-auto h-auto max-w-[min(94vw,54rem)] max-h-[calc(90vh-4rem)]"
+            style={{ objectFit: 'none' }}
+          />
           {list.length > 1 && (
             <>
               <button

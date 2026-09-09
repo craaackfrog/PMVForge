@@ -76,14 +76,6 @@ export default function PerformerCard({ libraryId }) {
     return paths.map(imageUrl).filter(Boolean)
   }, [profile])
 
-  useEffect(() => {
-    if (gallery.length <= 1) return undefined
-    const id = window.setInterval(() => {
-      setSlide((s) => (s + 1) % gallery.length)
-    }, 4000)
-    return () => window.clearInterval(id)
-  }, [gallery.length, libraryId])
-
   async function refresh() {
     if (!libraryId) return
     playTap()
@@ -109,50 +101,60 @@ export default function PerformerCard({ libraryId }) {
   const place = extras.birthplace || extras.country || extras.nationality || null
   const flag = flagFor(extras.country || extras.nationality || extras.birthplace)
   const rating = profile?.rating != null && profile.rating !== '' ? Number(profile.rating) : null
+  const current = gallery.length ? gallery[slide % gallery.length] : null
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <button
-        type="button"
-        onClick={() => {
-          if (gallery.length) {
-            playClick()
-            setModalOpen(true)
-          }
-        }}
-        className="aspect-auto w-full bg-secondary/40 flex items-center justify-center relative min-h-[120px] cursor-zoom-in disabled:cursor-default"
-        disabled={!gallery.length}
-        title={gallery.length ? 'View gallery' : undefined}
-      >
+      <div className="relative w-full aspect-[2/3] bg-secondary/40 overflow-hidden">
         {loading ? (
-          <Loader2 size={22} className="animate-spin text-muted-foreground" />
-        ) : gallery.length ? (
-          <>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 size={22} className="animate-spin text-muted-foreground" />
+          </div>
+        ) : current ? (
+          <button
+            type="button"
+            onClick={() => {
+              playClick()
+              setModalOpen(true)
+            }}
+            className="absolute inset-0 w-full h-full cursor-zoom-in"
+            title="View gallery"
+          >
             <img
-              key={gallery[slide % gallery.length]}
-              src={gallery[slide % gallery.length]}
+              src={current}
               alt={profile?.name || ''}
-              className="w-full h-auto object-cover transition-opacity duration-500"
+              className="w-full h-full object-cover object-center"
             />
-            {gallery.length > 1 && (
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-                {gallery.map((_, i) => (
-                  <span
-                    key={i}
-                    className={
-                      i === slide % gallery.length
-                        ? 'w-1.5 h-1.5 rounded-full bg-white shadow'
-                        : 'w-1.5 h-1.5 rounded-full bg-white/40'
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </>
+          </button>
         ) : (
-          <User size={40} className="text-muted-foreground opacity-40 py-10" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <User size={40} className="text-muted-foreground opacity-40" />
+          </div>
         )}
-      </button>
+      </div>
+
+      {gallery.length > 1 && (
+        <div className="flex justify-center gap-1.5 py-2 bg-card">
+          {gallery.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Photo ${i + 1}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                playTap()
+                setSlide(i)
+              }}
+              className={
+                i === slide % gallery.length
+                  ? 'w-2 h-2 rounded-full bg-foreground'
+                  : 'w-2 h-2 rounded-full bg-muted-foreground/40 hover:bg-muted-foreground/70'
+              }
+            />
+          ))}
+        </div>
+      )}
+
       <div className="p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -183,7 +185,11 @@ export default function PerformerCard({ libraryId }) {
           {race && <span>{race}</span>}
           {(place || flag) && (
             <span className="inline-flex items-center gap-1">
-              {flag && <span aria-hidden>{flag}</span>}
+              {flag && (
+                <span className="flag-emoji text-sm leading-none" aria-hidden>
+                  {flag}
+                </span>
+              )}
               {place && <span>{place}</span>}
             </span>
           )}
