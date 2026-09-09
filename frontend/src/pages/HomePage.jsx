@@ -61,7 +61,7 @@ export default function HomePage() {
             <div className="p-2 rounded-md bg-secondary">
               <Film size={20} />
             </div>
-            <h2 className="font-serif text-xl">Generate PMV</h2>
+            <h2 className="font-serif text-xl">PMV Creator</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
             Turn a beatmap + a folder of clips into a full PMV with
@@ -99,7 +99,7 @@ export default function HomePage() {
             <div className="p-2 rounded-md bg-pink-500/15 text-pink-400">
               <Heart size={20} />
             </div>
-            <h2 className="font-serif text-xl">Cock Hero</h2>
+            <h2 className="font-serif text-xl">CH Creator</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
             Add a Guitar Hero–style beatbar and optional click track to any

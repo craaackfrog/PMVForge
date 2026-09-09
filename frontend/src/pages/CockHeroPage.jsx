@@ -221,9 +221,9 @@ export default function CockHeroPage() {
     return (
       <div className="space-y-6">
         <header>
-          <h1 className="font-serif text-3xl tracking-tight">Cock Hero</h1>
+          <h1 className="font-serif text-3xl tracking-tight">CH Creator</h1>
           <p className="text-muted-foreground mt-1">
-            Burn a beatbar onto any PMV. Import files below, or use Create Cock Hero after Generate.
+            Burn a beatbar onto any PMV. Import files below, or use Create CH Creator after Generate.
           </p>
         </header>
 
@@ -276,7 +276,7 @@ export default function CockHeroPage() {
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-pink-500 hover:bg-pink-400 text-white text-sm font-medium disabled:opacity-50"
             >
               {manualBusy ? <Loader2 size={16} className="animate-spin" /> : <Heart size={16} />}
-              Open in Cock Hero
+              Open in CH Creator
             </button>
             <Link to="/generate" className="text-sm text-muted-foreground hover:text-foreground">
               or generate a new PMV →
@@ -291,7 +291,7 @@ export default function CockHeroPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="font-serif text-3xl tracking-tight">Cock Hero</h1>
+        <h1 className="font-serif text-3xl tracking-tight">CH Creator</h1>
         <p className="text-muted-foreground mt-1">
           {session?.label || 'Beatbar session'}
           {session?.duration ? ` · ${session.duration.toFixed(1)}s` : ''}
@@ -466,7 +466,7 @@ export default function CockHeroPage() {
           ) : (
             <>
               <Heart size={16} />
-              Render Cock Hero
+              Render CH Creator
             </>
           )}
         </button>

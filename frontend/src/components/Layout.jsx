@@ -16,10 +16,10 @@ const navItems = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/beats', label: 'Beat Creator', icon: Music2 },
   { to: '/editor', label: 'Beat Editor', icon: Pencil },
-  { to: '/generate', label: 'Generate PMV', icon: Film },
+  { to: '/generate', label: 'PMV Creator', icon: Film },
   { to: '/libraries', label: 'Clip Libraries', icon: Library },
   { to: '/songs', label: 'Song Libraries', icon: Music2 },
-  { to: '/cockhero', label: 'Cock Hero', icon: Heart },
+  { to: '/cockhero', label: 'CH Creator', icon: Heart },
   { to: '/history', label: 'History', icon: History },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]

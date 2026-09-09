@@ -349,7 +349,7 @@ export default function GeneratePage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="font-serif text-3xl tracking-tight">Generate PMV</h1>
+        <h1 className="font-serif text-3xl tracking-tight">PMV Creator</h1>
         <p className="text-muted-foreground mt-1">
           Paths stay on disk — native pickers, no uploading.
         </p>
@@ -397,7 +397,7 @@ export default function GeneratePage() {
         </button>
         <button onClick={() => { playTap(); startJob() }} disabled={submitting || isRunning || !canStart}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity">
-          {submitting || isRunning ? (<><Loader2 size={16} className="animate-spin" />{isRunning ? 'Generating…' : 'Starting…'}</>) : (<><Film size={16} />Generate PMV</>)}
+          {submitting || isRunning ? (<><Loader2 size={16} className="animate-spin" />{isRunning ? 'Generating…' : 'Starting…'}</>) : (<><Film size={16} />PMV Creator</>)}
         </button>
         {isRunning && (
           <button type="button" onClick={cancelJob} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm text-destructive hover:bg-accent">
