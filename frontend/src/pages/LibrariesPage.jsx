@@ -15,6 +15,7 @@ import {
   HelpCircle,
 } from 'lucide-react'
 import { playClick, playTap, playDone, playError } from '../lib/sounds'
+import VideoModal from '../components/VideoModal'
 import { nativePick } from '../lib/nativePick'
 import { cn } from '../lib/utils'
 
@@ -653,36 +654,3 @@ export default function LibrariesPage() {
   )
 }
 
-function VideoModal({ src, title, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div
-      id="videoModal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-4xl rounded-xl overflow-hidden border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-          <span className="text-sm font-medium truncate pr-4">{title || 'Preview'}</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <video src={src} controls autoPlay className="w-full max-h-[75vh] bg-black" />
-      </div>
-    </div>
-  )
-}
