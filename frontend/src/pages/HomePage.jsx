@@ -91,6 +91,25 @@ export default function HomePage() {
           </span>
         </Link>
 
+
+        <Link
+          to="/songs"
+          className="group block rounded-lg border border-border bg-card p-6 hover:border-ring transition-colors"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-2 rounded-md bg-secondary">
+              <Music2 size={20} />
+            </div>
+            <h2 className="font-serif text-xl">Song Libraries</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Index extracted osu! sets — audio + beatmaps per folder, sorted by map density.
+          </p>
+          <span className="inline-flex items-center gap-1 text-sm text-foreground group-hover:gap-2 transition-all">
+            Open <ArrowRight size={14} />
+          </span>
+        </Link>
+
         <Link
           to="/cockhero"
           className="group block rounded-lg border border-border bg-card p-6 hover:border-ring transition-colors"
