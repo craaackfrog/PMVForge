@@ -63,7 +63,7 @@ export default function PerformerCard({ libraryId }) {
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
-      <div className="aspect-square bg-secondary/40 flex items-center justify-center relative">
+      <div className="aspect-auto bg-secondary/40 flex items-center justify-center relative">
         {loading ? (
           <Loader2 size={22} className="animate-spin text-muted-foreground" />
         ) : img ? (
