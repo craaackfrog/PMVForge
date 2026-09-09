@@ -13,6 +13,8 @@ import {
   X,
   Plus,
   HelpCircle,
+  ArrowDownAZ,
+  ArrowUpAZ,
 } from 'lucide-react'
 import { playClick, playTap, playDone, playError } from '../lib/sounds'
 import VideoModal from '../components/VideoModal'
@@ -46,6 +48,7 @@ export default function LibrariesPage() {
   const [newTag, setNewTag] = useState('')
   const [previewPath, setPreviewPath] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [folderSort, setFolderSort] = useState('az') // az | za
 
   const active = libraries.find((l) => l.id === activeId)
 
@@ -267,6 +270,11 @@ export default function LibrariesPage() {
 
   // Single sorted vocabulary for the whole UI (global tags store)
   const vocab = [...allTags].sort((a, b) => a.localeCompare(b))
+  const sortedLibraries = [...libraries].sort((a, b) => {
+    const cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+    return folderSort === 'za' ? -cmp : cmp
+  })
+
 
   return (
     <div className="space-y-5">
@@ -340,6 +348,17 @@ export default function LibrariesPage() {
             <p className="text-xs uppercase tracking-wide text-muted-foreground flex-1">Folders</p>
             <button
               type="button"
+              title={folderSort === 'az' ? 'Sort Z–A' : 'Sort A–Z'}
+              onClick={() => {
+                playClick()
+                setFolderSort((s) => (s === 'az' ? 'za' : 'az'))
+              }}
+              className="p-1.5 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              {folderSort === 'az' ? <ArrowDownAZ size={14} /> : <ArrowUpAZ size={14} />}
+            </button>
+            <button
+              type="button"
               title="Rescan library"
               onClick={rescan}
               disabled={!activeId || scanning}
@@ -360,7 +379,7 @@ export default function LibrariesPage() {
           {libraries.length === 0 && (
             <p className="text-sm text-muted-foreground px-1 py-3">No libraries yet. Hit Add folder.</p>
           )}
-          {libraries.map((lib) => (
+          {sortedLibraries.map((lib) => (
             <button
               key={lib.id}
               type="button"
