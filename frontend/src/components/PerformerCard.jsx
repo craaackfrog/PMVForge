@@ -39,6 +39,24 @@ function flagFor(place) {
   return ''
 }
 
+function ageFromProfile(profile) {
+  if (profile?.age != null && profile.age !== '') {
+    const n = Number(profile.age)
+    if (!Number.isNaN(n) && n > 0) return n
+  }
+  const bday = profile?.extras?.birthday
+  if (!bday) return null
+  const m = String(bday).match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (!m) return null
+  const born = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  if (Number.isNaN(born.getTime())) return null
+  const today = new Date()
+  let age = today.getFullYear() - born.getFullYear()
+  const md = today.getMonth() - born.getMonth()
+  if (md < 0 || (md === 0 && today.getDate() < born.getDate())) age -= 1
+  return age > 0 && age < 120 ? age : null
+}
+
 export default function PerformerCard({ libraryId }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -121,6 +139,7 @@ export default function PerformerCard({ libraryId }) {
   // Explicit flag_country (manual override) wins; else derive from birthplace only
   const flagSource = extras.flag_country || extras.flag || place
   const flag = flagFor(flagSource)
+  const age = ageFromProfile(profile)
   const rating = profile?.rating != null && profile.rating !== '' ? Number(profile.rating) : null
 
   const current = gallery.length ? gallery[slide % gallery.length] : null
@@ -204,19 +223,26 @@ export default function PerformerCard({ libraryId }) {
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          {rating != null && !Number.isNaN(rating) && (
-            <span className="inline-flex items-center gap-0.5 text-amber-400/90">
-              <Star size={12} className="fill-current" />
-              {rating.toFixed(1)}
-            </span>
-          )}
-          {race && <span>{race}</span>}
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {rating != null && !Number.isNaN(rating) && (
+              <span className="inline-flex items-center gap-0.5 text-amber-400/90">
+                <Star size={12} className="fill-current" />
+                {rating.toFixed(1)}
+              </span>
+            )}
+            {race && <span>{race}</span>}
+            {age != null && <span>{age}</span>}
+          </div>
           {(place || flag) && (
-            <span className="inline-flex items-center gap-1">
-              {flag && <span className="flag-emoji text-base leading-none" aria-hidden>{flag}</span>}
+            <div className="inline-flex items-center gap-1.5">
+              {flag ? (
+                <span className="flag-emoji text-base leading-none" aria-hidden>
+                  {flag}
+                </span>
+              ) : null}
               {place && <span>{place}</span>}
-            </span>
+            </div>
           )}
         </div>
 
