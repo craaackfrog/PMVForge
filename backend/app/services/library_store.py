@@ -303,6 +303,8 @@ def scan_library(lib_id: str, progress_cb=None) -> Library:
             "heat": int(prev.get("heat") or 3) if prev else 3,
             **probe,
         }
+        if prev and prev.get("scene"):
+            meta["scene"] = prev.get("scene")
         return key, meta
 
     from concurrent.futures import ThreadPoolExecutor, as_completed

@@ -13,11 +13,13 @@ import {
   X,
   Plus,
   HelpCircle,
+  Pencil,
   ArrowDownAZ,
   ArrowUpAZ,
 } from 'lucide-react'
 import { playClick, playTap, playDone, playError } from '../lib/sounds'
 import VideoModal from '../components/VideoModal'
+import SceneMatchModal from '../components/SceneMatchModal'
 import PerformerCard from '../components/PerformerCard'
 import { nativePick } from '../lib/nativePick'
 import { cn } from '../lib/utils'
@@ -47,6 +49,7 @@ export default function LibrariesPage() {
   const [bulkHeat, setBulkHeat] = useState(3)
   const [newTag, setNewTag] = useState('')
   const [previewPath, setPreviewPath] = useState(null)
+  const [matchClip, setMatchClip] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
   const [folderSort, setFolderSort] = useState('az') // az | za
 
@@ -550,6 +553,17 @@ export default function LibrariesPage() {
                         >
                           <Play size={14} />
                         </button>
+                        <button
+                          type="button"
+                          title="Match scene (ThePornDB)"
+                          onClick={() => {
+                            playClick()
+                            setMatchClip(clip)
+                          }}
+                          className="shrink-0 p-1.5 rounded-md bg-secondary hover:bg-accent"
+                        >
+                          <Pencil size={14} />
+                        </button>
 
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="text-sm font-medium truncate" title={clip.path}>
@@ -670,6 +684,19 @@ export default function LibrariesPage() {
           src={mediaUrl(previewPath)}
           title={previewPath.split(/[/\\]/).pop()}
           onClose={() => setPreviewPath(null)}
+        />
+      )}
+      {matchClip && (
+        <SceneMatchModal
+          libraryId={activeId}
+          libraryName={active?.name}
+          clip={matchClip}
+          onClose={() => setMatchClip(null)}
+          onApplied={async () => {
+            setMatchClip(null)
+            await loadClips()
+            await refreshList()
+          }}
         />
       )}
     </div>

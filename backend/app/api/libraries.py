@@ -247,6 +247,66 @@ async def scan_library(lib_id: str):
     }
 
 
+
+
+class SceneSearchRequest(BaseModel):
+    query: Optional[str] = None
+    path: Optional[str] = None  # clip path — used to seed filename parse
+    use_parse: bool = True
+    page: int = 1
+
+
+class SceneApplyRequest(BaseModel):
+    path: str
+    scene: dict
+    rename: bool = True
+    push_tags: bool = True
+    link_performers: Optional[List[str]] = None  # None = all female co-stars
+    create_missing_libraries: bool = True
+
+
+@router.post("/{lib_id}/scene/search")
+async def scene_search(lib_id: str, req: SceneSearchRequest):
+    """Search ThePornDB scenes/movies (filename parse first when path given)."""
+    from ..services import tpdb_client
+    from pathlib import Path as P
+    lib = store.load_library(lib_id)
+    if not lib:
+        raise HTTPException(404, "Library not found")
+    actress = lib.name or ""
+    q = (req.query or "").strip()
+    if not q and req.path:
+        q = tpdb_client.filename_parse_query(P(req.path).name, actress)
+    elif not q:
+        q = actress
+    try:
+        data = tpdb_client.search_combined(q, use_parse=req.use_parse, page=req.page or 1)
+        data["seed_query"] = q
+        data["actress"] = actress
+        return data
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/{lib_id}/scene/apply")
+async def scene_apply(lib_id: str, req: SceneApplyRequest):
+    from ..services import scene_apply as sa
+    try:
+        return sa.apply_scene_match(
+            lib_id,
+            req.path,
+            req.scene,
+            rename=req.rename,
+            push_tags=req.push_tags,
+            link_performers=req.link_performers,
+            create_missing_libraries=req.create_missing_libraries,
+        )
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 @router.get("/{lib_id}/clips")
 async def list_clips(
     lib_id: str,
