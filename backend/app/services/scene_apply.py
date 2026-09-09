@@ -14,6 +14,18 @@ from . import library_store as store
 from . import tpdb_client
 
 
+def sanitize_filename(name: str, fallback_ext: str = ".mp4") -> str:
+    name = (name or "").strip()
+    name = re.sub(r'[<>:"/\\|?*]', "", name)
+    name = re.sub(r"\s+", " ", name).strip(" .")
+    if not name:
+        name = "clip"
+    if "." not in Path(name).name:
+        ext = fallback_ext if fallback_ext.startswith(".") else f".{fallback_ext}"
+        name = f"{name}{ext}"
+    return name
+
+
 def stash_filename(
     *,
     studio: str,
@@ -113,6 +125,7 @@ def apply_scene_match(
     scene: dict,
     *,
     rename: bool = True,
+    filename: Optional[str] = None,
     push_tags: bool = True,
     link_performers: Optional[List[str]] = None,
     create_missing_libraries: bool = True,
@@ -152,13 +165,16 @@ def apply_scene_match(
     # --- rename ---
     new_path = src
     if rename:
-        new_name = stash_filename(
-            studio=scene.get("studio") or "",
-            date=scene.get("date") or "",
-            title=scene.get("title") or "",
-            performers=female_names,
-            ext=src.suffix,
-        )
+        if filename and str(filename).strip():
+            new_name = sanitize_filename(str(filename).strip(), src.suffix or ".mp4")
+        else:
+            new_name = stash_filename(
+                studio=scene.get("studio") or "",
+                date=scene.get("date") or "",
+                title=scene.get("title") or "",
+                performers=female_names,
+                ext=src.suffix,
+            )
         new_path = _rename_file(src, new_name)
 
     # --- update clip record (path may change) ---
@@ -262,3 +278,29 @@ def apply_scene_match(
         "prompts": prompts,
         "scene": clip.get("scene"),
     }
+
+
+def rename_clip_only(lib_id: str, path: str, filename: str) -> Dict[str, Any]:
+    """Rename a clip on disk and update library index (post-match edits)."""
+    lib = store.load_library(lib_id)
+    if not lib:
+        raise ValueError("Library not found")
+    key = path
+    if key not in lib.clips:
+        try:
+            key = str(Path(path).resolve())
+        except Exception:
+            pass
+    if key not in lib.clips:
+        raise ValueError("Clip not in library")
+    src = Path(key)
+    if not src.is_file():
+        raise ValueError(f"File missing: {key}")
+    new_name = sanitize_filename(filename, src.suffix or ".mp4")
+    new_path = _rename_file(src, new_name)
+    clip = dict(lib.clips.pop(key))
+    clip["path"] = str(new_path.resolve())
+    clip["name"] = new_path.name
+    lib.clips[clip["path"]] = clip
+    store.save_library(lib)
+    return {"clip": clip, "path": clip["path"]}

@@ -50,6 +50,9 @@ export default function LibrariesPage() {
   const [newTag, setNewTag] = useState('')
   const [previewPath, setPreviewPath] = useState(null)
   const [matchClip, setMatchClip] = useState(null)
+  const [renameClip, setRenameClip] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
+
   const [showHelp, setShowHelp] = useState(false)
   const [folderSort, setFolderSort] = useState('az') // az | za
 
@@ -698,6 +701,44 @@ export default function LibrariesPage() {
             await refreshList()
           }}
         />
+      )}
+      {renameClip && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setRenameClip(null)} />
+          <div className="relative z-10 w-full max-w-lg rounded-lg border border-border bg-card p-4 space-y-3 shadow-xl">
+            <p className="text-sm font-medium">Rename file</p>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm font-mono"
+            />
+            <div className="flex justify-end gap-2">
+              <button type="button" className="px-3 py-1.5 text-sm rounded-md hover:bg-secondary" onClick={() => setRenameClip(null)}>Cancel</button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/libraries/${activeId}/clip/rename`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ path: renameClip.path, filename: renameValue }),
+                    })
+                    const data = await res.json().catch(() => ({}))
+                    if (!res.ok) throw new Error(data.detail || res.statusText)
+                    setRenameClip(null)
+                    await loadClips()
+                  } catch (e) {
+                    setError(e.message)
+                  }
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
