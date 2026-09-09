@@ -6,6 +6,7 @@ import BeatEditorPage from './pages/BeatEditorPage'
 import GeneratePage from './pages/GeneratePage'
 import CockHeroPage from './pages/CockHeroPage'
 import LibrariesPage from './pages/LibrariesPage'
+import SongLibrariesPage from './pages/SongLibrariesPage'
 import HistoryPage from './pages/HistoryPage'
 import SettingsPage from './pages/SettingsPage'
 
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/editor" element={<BeatEditorPage />} />
         <Route path="/generate" element={<GeneratePage />} />
         <Route path="/libraries" element={<LibrariesPage />} />
+        <Route path="/songs" element={<SongLibrariesPage />} />
         <Route path="/cockhero" element={<CockHeroPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/settings" element={<SettingsPage />} />

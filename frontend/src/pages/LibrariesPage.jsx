@@ -270,7 +270,7 @@ export default function LibrariesPage() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-serif text-3xl tracking-tight">Libraries</h1>
+          <h1 className="font-serif text-3xl tracking-tight">Clip Libraries</h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
             Point at a clips folder, then tag and rate each file. In Generate, pick{' '}
             <strong className="text-foreground">Library</strong> mode to pull by tag + heat.
