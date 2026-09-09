@@ -22,7 +22,7 @@ const COUNTRY_FLAG = {
   israel: '🇮🇱', 'south africa': '🇿🇦', ireland: '🇮🇪', scotland: '🇬🇧', wales: '🇬🇧',
   austria: '🇦🇹', switzerland: '🇨🇭', belgium: '🇧🇪', latvia: '🇱🇻', lithuania: '🇱🇹',
   estonia: '🇪🇪', bulgaria: '🇧🇬', serbia: '🇷🇸', croatia: '🇭🇷', slovenia: '🇸🇮',
-  dominican: '🇩🇴', 'dominican republic': '🇩🇴', 'puerto rico': '🇵🇷',
+  dominican: '🇩🇴', 'dominican republic': '🇩🇴', 'puerto rico': '🇵🇷', syria: '🇸🇾'
 }
 
 function flagFor(place) {
