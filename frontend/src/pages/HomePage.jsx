@@ -81,7 +81,7 @@ export default function HomePage() {
             <div className="p-2 rounded-md bg-secondary">
               <Library size={20} />
             </div>
-            <h2 className="font-serif text-xl">Clip Clip Libraries</h2>
+            <h2 className="font-serif text-xl">Clip Libraries</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
             Organize clip folders with tags and heat rankings so Generate can pull the right shots.
