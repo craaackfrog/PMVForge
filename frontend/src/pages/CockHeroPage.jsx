@@ -223,7 +223,7 @@ export default function CockHeroPage() {
         <header>
           <h1 className="font-serif text-3xl tracking-tight">CH Creator</h1>
           <p className="text-muted-foreground mt-1">
-            Burn a beatbar onto any PMV. Import files below, or use Create CH Creator after Generate.
+            Burn a beatbar onto any PMV. Import files below, or use CH Creator after Generate.
           </p>
         </header>
 
@@ -466,7 +466,7 @@ export default function CockHeroPage() {
           ) : (
             <>
               <Heart size={16} />
-              Render CH Creator
+              Render Cock Hero
             </>
           )}
         </button>
