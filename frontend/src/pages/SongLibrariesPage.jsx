@@ -269,7 +269,9 @@ export default function SongLibrariesPage() {
                             {(song.osu_files || []).map((f) => (
                               <li key={f.path} className="flex items-center gap-2 text-sm text-muted-foreground py-0.5" title={f.path}>
                                 <FileText size={14} className="shrink-0 opacity-70" />
-                                <span className="font-mono text-xs truncate text-foreground">{f.name}</span>
+                                <span className="font-mono text-xs truncate text-foreground">
+                                  {f.version ? `[${f.version}]` : f.name}
+                                </span>
                                 <span className="text-[11px] opacity-70 shrink-0">{f.size_label || formatSize(f.size)}</span>
                               </li>
                             ))}

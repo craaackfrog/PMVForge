@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from ..config import get_config_dir
+from .osu_editor import parse_osu_file
 
 AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".wma", ".opus"}
 OSU_EXT = ".osu"
@@ -231,34 +232,101 @@ def rename_library(lib_id: str, name: str) -> SongLibrary:
     return lib
 
 
+def _display_name_from_meta(artist: str, title: str, creator: str, fallback: str) -> str:
+    artist = (artist or "").strip()
+    title = (title or "").strip()
+    creator = (creator or "").strip()
+    if artist and title and creator:
+        return f"{artist} - {title} ({creator})"
+    if artist and title:
+        return f"{artist} - {title}"
+    if title:
+        return title
+    return fallback
+
+
 def _scan_song_dir(folder: Path) -> Optional[SongEntry]:
-    """Index one immediate child folder — no further recursion."""
+    """Index one immediate child folder — no further recursion.
+
+    Song label comes from .osu [Metadata] (Artist - Title (Creator)).
+    Only the AudioFilename referenced by the maps is kept as audio.
+    """
     if not folder.is_dir():
         return None
     osu_files: List[dict] = []
-    audio_files: List[dict] = []
+    audio_by_name: Dict[str, dict] = {}
+    audio_filenames: set = set()
+    artist = title = creator = ""
     try:
         children = list(folder.iterdir())
     except PermissionError:
         return None
+
     for f in children:
         if not f.is_file():
             continue
         ext = f.suffix.lower()
         if ext == OSU_EXT:
             entry = FileEntry.from_path(f).to_dict()
+            try:
+                meta = parse_osu_file(f)
+                entry["version"] = meta.get("version") or ""
+                entry["audio_filename"] = meta.get("audio_filename") or ""
+                entry["artist"] = meta.get("artist") or ""
+                entry["title"] = meta.get("title") or ""
+                entry["creator"] = meta.get("creator") or ""
+                if entry["audio_filename"]:
+                    audio_filenames.add(Path(entry["audio_filename"]).name.lower())
+                # Prefer metadata from the largest map later; collect candidates now
+                if not artist and entry["artist"]:
+                    artist = entry["artist"]
+                if not title and entry["title"]:
+                    title = entry["title"]
+                if not creator and entry["creator"]:
+                    creator = entry["creator"]
+            except Exception:
+                pass
             osu_files.append(entry)
         elif ext in AUDIO_EXTS:
             entry = FileEntry.from_path(f).to_dict()
-            audio_files.append(entry)
+            audio_by_name[f.name.lower()] = entry
+
+    if not osu_files and not audio_by_name:
+        return None
+
     # Larger .osu first (more lines ≈ harder / more beats)
     osu_files.sort(key=lambda e: int(e.get("size") or 0), reverse=True)
-    audio_files.sort(key=lambda e: (e.get("name") or "").lower())
-    if not osu_files and not audio_files:
-        return None
+
+    # Re-pick metadata from the largest map (most authoritative for the set)
+    if osu_files:
+        top = osu_files[0]
+        artist = top.get("artist") or artist
+        title = top.get("title") or title
+        creator = top.get("creator") or creator
+        if top.get("audio_filename"):
+            audio_filenames.add(Path(top["audio_filename"]).name.lower())
+
+    # Only keep the audio file(s) referenced by AudioFilename
+    audio_files: List[dict] = []
+    if audio_filenames:
+        for name in sorted(audio_filenames):
+            if name in audio_by_name:
+                audio_files.append(audio_by_name[name])
+            else:
+                # try case-insensitive / missing extension edge cases
+                for k, v in audio_by_name.items():
+                    if k == name or Path(k).stem.lower() == Path(name).stem.lower():
+                        audio_files.append(v)
+                        break
+    elif len(audio_by_name) == 1:
+        # no AudioFilename parsed — fall back to the single audio present
+        audio_files = list(audio_by_name.values())
+
+    display = _display_name_from_meta(artist, title, creator, folder.name)
+
     return SongEntry(
         path=str(folder.resolve()),
-        name=folder.name,
+        name=display,
         osu_files=osu_files,
         audio_files=audio_files,
     )
