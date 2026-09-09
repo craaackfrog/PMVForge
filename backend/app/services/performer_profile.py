@@ -411,63 +411,112 @@ def get_profile_for_library(lib_id: str, *, force_refresh: bool = False) -> dict
 
 
 
-def save_local_override(lib_id: str, payload: dict) -> dict:
-    """Write info.json into the library root; local override always wins on next load."""
+def save_performer_edit(lib_id: str, payload: dict) -> dict:
+    """
+    Edit the existing on-disk profile JSON in place.
+
+    Priority:
+      1. {library_root}/info.json  — if it already exists
+      2. {config}/performer_cache/{slug}/profile.json — the cached ThePornDB profile
+
+    Does not create a separate "override layer"; merges into the file already in use.
+    """
     lib = lib_store.load_library(lib_id)
     if not lib:
         raise ValueError("Library not found")
     root = Path(lib.root_path)
-    if not root.is_dir():
-        raise ValueError(f"Library root missing: {lib.root_path}")
+    query_name = lib.name or (root.name if root.exists() else lib_id)
+    key = _slug(query_name)
 
+    info_path = root / "info.json" if root.is_dir() else None
+    cache_path = _cache_dir(key) / "profile.json"
+
+    if info_path and info_path.is_file():
+        target = info_path
+        kind = "info.json"
+    elif cache_path.is_file():
+        target = cache_path
+        kind = "cache"
+    else:
+        # No file yet — create cache profile so edits persist
+        target = cache_path
+        kind = "cache"
+
+    existing: dict = {}
+    if target.is_file():
+        try:
+            existing = json.loads(target.read_text(encoding="utf-8"))
+            if not isinstance(existing, dict):
+                existing = {}
+        except Exception:
+            existing = {}
+
+    extras = dict(existing.get("extras") or {})
     extras_in = payload.get("extras") if isinstance(payload.get("extras"), dict) else {}
-    extras = {}
     for k in ("ethnicity", "birthplace", "country", "nationality", "birthday", "flag_country", "flag"):
-        v = extras_in.get(k) if k in extras_in else payload.get(k)
-        if v is not None and str(v).strip() != "":
-            extras[k] = str(v).strip()
+        if k in extras_in:
+            v = extras_in.get(k)
+            if v is None or str(v).strip() == "":
+                extras.pop(k, None)
+            else:
+                extras[k] = str(v).strip()
+        elif k in payload:
+            v = payload.get(k)
+            if v is None or str(v).strip() == "":
+                extras.pop(k, None)
+            else:
+                extras[k] = str(v).strip()
 
-    aliases = payload.get("aliases") or []
+    aliases = payload.get("aliases") if "aliases" in payload else existing.get("aliases") or []
     if isinstance(aliases, str):
         aliases = [a.strip() for a in aliases.split(",") if a.strip()]
     else:
-        aliases = [str(a).strip() for a in aliases if str(a).strip()]
+        aliases = [str(a).strip() for a in (aliases or []) if str(a).strip()]
 
-    rating = payload.get("rating")
-    try:
-        rating = float(rating) if rating is not None and rating != "" else None
-    except (TypeError, ValueError):
-        rating = None
-    age = payload.get("age")
-    try:
-        age = int(age) if age is not None and age != "" else None
-    except (TypeError, ValueError):
-        age = None
+    def _num(val, cast):
+        if val is None or val == "":
+            return None
+        try:
+            return cast(val)
+        except (TypeError, ValueError):
+            return None
 
-    data = {
-        "name": (payload.get("name") or lib.name or root.name or "").strip(),
-        "bio": (payload.get("bio") or "").strip(),
-        "aliases": aliases,
-        "query": (payload.get("query") or payload.get("name") or lib.name or "").strip(),
-        "extras": extras,
-    }
+    rating = _num(payload["rating"], float) if "rating" in payload else existing.get("rating")
+    age = _num(payload["age"], int) if "age" in payload else existing.get("age")
+
+    data = dict(existing)
+    if "name" in payload and payload.get("name") is not None:
+        data["name"] = str(payload.get("name") or "").strip() or data.get("name") or query_name
+    if "bio" in payload and payload.get("bio") is not None:
+        data["bio"] = str(payload.get("bio") or "").strip()
+    data["aliases"] = aliases
+    data["extras"] = extras
+    data["query"] = data.get("query") or query_name
     if rating is not None:
         data["rating"] = rating
+    elif "rating" in payload:
+        data.pop("rating", None)
     if age is not None:
         data["age"] = age
+    elif "age" in payload:
+        data.pop("age", None)
     if payload.get("tpdb_id"):
         data["tpdb_id"] = payload.get("tpdb_id")
-    if payload.get("image"):
-        data["image"] = payload.get("image")
+    data["source"] = existing.get("source") or ("local" if kind == "info.json" else "cache")
+    data["user_edited"] = True
 
-    info_path = root / "info.json"
-    info_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    # Keep image paths already on disk
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
     out = get_profile_for_library(lib_id, force_refresh=False)
-    out["info_path"] = str(info_path.resolve())
+    out["edited_path"] = str(target.resolve())
+    out["edited_kind"] = kind
     return out
 
 
 def clear_local_override(lib_id: str) -> dict:
+    """Compatibility: remove library-root info.json if present."""
     lib = lib_store.load_library(lib_id)
     if not lib:
         raise ValueError("Library not found")
@@ -476,6 +525,12 @@ def clear_local_override(lib_id: str) -> dict:
     if info_path.is_file():
         info_path.unlink()
     return get_profile_for_library(lib_id, force_refresh=False)
+
+
+
+def save_local_override(lib_id: str, payload: dict) -> dict:
+    """Deprecated name — edits existing JSON in place."""
+    return save_performer_edit(lib_id, payload)
 
 def media_path_allowed(path: str) -> bool:
     """True if path is under performer_cache or a library root cover."""

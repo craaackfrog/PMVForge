@@ -87,7 +87,7 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
   }
 
   async function removeOverride() {
-    if (!confirm('Delete info.json override and fall back to ThePornDB/cache?')) return
+    if (!confirm('Delete library info.json if present? Cached profile is left as-is.')) return
     playTap()
     setSaving(true)
     setError(null)
@@ -125,8 +125,12 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
       >
         <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
           <div>
-            <p className="text-sm font-medium">Edit performer override</p>
-            <p className="text-[11px] text-muted-foreground">Saved as info.json in the library folder</p>
+            <p className="text-sm font-medium">Edit performer profile</p>
+            <p className="text-[11px] text-muted-foreground">
+              {profile?.override || profile?.source === 'local'
+                ? 'Editing library info.json'
+                : 'Editing cached profile JSON'}
+            </p>
           </div>
           <button type="button" onClick={requestClose} className="p-1.5 rounded-md hover:bg-secondary" aria-label="Close">
             <X size={18} />
@@ -147,7 +151,7 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
             value={form.flag_country}
             onChange={(v) => update('flag_country', v)}
             placeholder="Ukraine"
-            hint="Country name used for the flag emoji only (overrides birthplace for the flag). Examples: Ukraine, Brazil, United States."
+            hint="Country name for the flag emoji only. Examples: Ukraine, Brazil, United States."
           />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Birthday" value={form.birthday} onChange={(v) => update('birthday', v)} placeholder="YYYY-MM-DD" />
@@ -175,7 +179,7 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-destructive hover:bg-secondary disabled:opacity-50"
           >
             <Trash2 size={14} />
-            Clear override
+            Remove info.json
           </button>
           <div className="flex gap-2">
             <button type="button" onClick={requestClose} className="px-3 py-2 rounded-md text-sm hover:bg-secondary">
@@ -188,7 +192,7 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              Save info.json
+              Save
             </button>
           </div>
         </div>
