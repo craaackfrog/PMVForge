@@ -1,19 +1,10 @@
+import { nativePick } from '../lib/nativePick'
 import { useState } from 'react'
 import { usePersistentState } from '../hooks/usePersistentState'
 import { APP_NAME } from '../lib/config'
 import { Upload, Download, Loader2, FolderOpen } from 'lucide-react'
 import WaveformEditor from '../components/WaveformEditor'
 
-async function nativePick(endpoint, params = {}) {
-  const qs = new URLSearchParams(params).toString()
-  const url = qs ? `/api${endpoint}?${qs}` : `/api${endpoint}`
-  const res = await fetch(url, { method: 'POST' })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || res.statusText)
-  }
-  return res.json()
-}
 
 export default function BeatCreatorPage() {
   const [file, setFile] = useState(null) // File objects can't survive reload

@@ -6,73 +6,18 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Monitor,
-  Smartphone,
   Eye,
-  FolderOpen,
-  Files,
   Download,
-  FileAudio,
-  Music2,
   Heart,
-  Library,
-  Tag,
 } from 'lucide-react'
 import VideoModal from '../components/VideoModal'
 import { playClick, playTap, playStart, playDone, playError } from '../lib/sounds'
-
-const DEFAULTS = {
-  clip_dist: 0.4,
-  aspect: '16:9',
-  quality: 'hd',
-  zoom_to_fill: false,
-  clip_order: 'random',
-  fps: 30,
-  bitrate: '',
-  threads: 4,
-  cuda: false,
-  debug: false,
-  num_vids: 0,
-  recurse: false,
-  effects: {
-    enabled: false,
-    soft_pulse: true,
-    soft_pulse_strength: 0.12,
-    flash: false,
-    flash_strength: 0.55,
-    flash_max_per_sec: 8,
-    zoom_punch: true,
-    zoom_punch_amount: 1.06,
-    rgb_split: false,
-    rgb_split_px: 4,
-    pink_glow: false,
-    pink_glow_strength: 0.35,
-    pink_glow_saturation: 1.15,
-  },
-}
-
-const QUALITY_LABELS = { hd: 'HD', fhd: 'Full HD', '4k': '4K' }
-const RES_HINT = {
-  '16:9': { hd: '1280×720', fhd: '1920×1080', '4k': '3840×2160' },
-  '9:16': { hd: '720×1280', fhd: '1080×1920', '4k': '2160×3840' },
-}
-
-async function nativePick(endpoint, params = {}) {
-  const qs = new URLSearchParams(params).toString()
-  const url = qs ? `/api${endpoint}?${qs}` : `/api${endpoint}`
-  const res = await fetch(url, { method: 'POST' })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.detail || res.statusText)
-  }
-  return res.json()
-}
-
-function chipClass(active) {
-  return active
-    ? 'inline-flex items-center gap-2 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium'
-    : 'inline-flex items-center gap-2 px-3 py-2 rounded-md bg-secondary text-sm hover:bg-accent transition-colors'
-}
+import { nativePick } from '../lib/nativePick'
+import { DEFAULTS, RES_HINT } from '../components/generate/defaults'
+import InputsSection from '../components/generate/InputsSection'
+import FormatSection from '../components/generate/FormatSection'
+import EffectsSection from '../components/generate/EffectsSection'
+import OptionsSection from '../components/generate/OptionsSection'
 
 export default function GeneratePage() {
   const navigate = useNavigate()
@@ -410,244 +355,41 @@ export default function GeneratePage() {
         </p>
       </header>
 
-<section className="rounded-lg border border-border bg-card p-6 space-y-5">
-        <h2 className="font-serif text-lg">Inputs</h2>
-        <PathRow label="Beatmap" value={beatPath} placeholder="Select a .osu / .txt / .json…" onBrowse={browseBeat} onClear={() => setBeatPath('')} busy={picking === 'beat'} icon={Music2} />
-        <PathRow label="Song override (optional)" value={songPath} placeholder="Only if audio isn’t next to the beatmap…" onBrowse={browseSong} onClear={() => setSongPath('')} busy={picking === 'song'} icon={FileAudio} />
+      <InputsSection
+        beatPath={beatPath}
+        songPath={songPath}
+        clipMode={clipMode}
+        videoFolder={videoFolder}
+        videoPaths={videoPaths}
+        outputFolder={outputFolder}
+        libraryId={libraryId}
+        libraryTags={libraryTags}
+        libraryTagMode={libraryTagMode}
+        libraryMinHeat={libraryMinHeat}
+        libraries={libraries}
+        libTagVocab={libTagVocab}
+        libPreviewCount={libPreviewCount}
+        picking={picking}
+        setBeatPath={setBeatPath}
+        setSongPath={setSongPath}
+        setClipMode={setClipMode}
+        setVideoFolder={setVideoFolder}
+        setVideoPaths={setVideoPaths}
+        setOutputFolder={setOutputFolder}
+        setLibraryId={setLibraryId}
+        setLibraryTags={setLibraryTags}
+        setLibraryTagMode={setLibraryTagMode}
+        setLibraryMinHeat={setLibraryMinHeat}
+        browseBeat={browseBeat}
+        browseSong={browseSong}
+        browseVideoFolder={browseVideoFolder}
+        browseClips={browseClips}
+        browseOutput={browseOutput}
+      />
 
-        <div>
-          <label className="block text-sm text-muted-foreground mb-2">Source clips</label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button type="button" onClick={() => { playClick(); setClipMode('all') }} className={chipClass(clipMode === 'all')}>
-              <FolderOpen size={16} /> All clips
-            </button>
-            <button type="button" onClick={() => { playClick(); setClipMode('pick') }} className={chipClass(clipMode === 'pick')}>
-              <Files size={16} /> Pick clips
-            </button>
-            <button type="button" onClick={() => { playClick(); setClipMode('library') }} className={chipClass(clipMode === 'library')}>
-              <Library size={16} /> Library
-            </button>
-          </div>
-          {clipMode === 'all' ? (
-            <PathRow value={videoFolder} placeholder="Select a folder of clips…" onBrowse={browseVideoFolder} onClear={() => setVideoFolder('')} busy={picking === 'vfolder'} icon={FolderOpen} />
-          ) : clipMode === 'pick' ? (
-            <div className="space-y-2">
-              <PathRow value={videoPaths.length ? `${videoPaths.length} clip${videoPaths.length === 1 ? '' : 's'} selected` : ''} placeholder="Select individual clips…" onBrowse={browseClips} onClear={() => setVideoPaths([])} busy={picking === 'clips'} icon={Files} />
-              {videoPaths.length > 0 && (
-                <div className="max-h-28 overflow-auto rounded-md bg-secondary/40 px-3 py-2 text-xs text-muted-foreground space-y-0.5 font-mono">
-                  {videoPaths.slice(0, 40).map((p) => (<div key={p} className="truncate">{p}</div>))}
-                  {videoPaths.length > 40 && <div>…and {videoPaths.length - 40} more</div>}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3 rounded-md border border-border bg-secondary/20 p-3">
-              <div>
-                <label className="text-xs text-muted-foreground">Library</label>
-                <select
-                  value={libraryId}
-                  onChange={(e) => { playClick(); setLibraryId(e.target.value) }}
-                  className="mt-1 w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm"
-                >
-                  <option value="">Select library…</option>
-                  {libraries.map((lib) => (
-                    <option key={lib.id} value={lib.id}>
-                      {lib.name} ({lib.clip_count} clips)
-                    </option>
-                  ))}
-                </select>
-                {libraries.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    No libraries yet — create one under Libraries.
-                  </p>
-                )}
-              </div>
-              {libraryId && (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {libTagVocab.slice(0, 24).map((tag) => {
-                      const on = libraryTags.includes(tag)
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => {
-                            playClick()
-                            setLibraryTags(
-                              on ? libraryTags.filter((t) => t !== tag) : [...libraryTags, tag]
-                            )
-                          }}
-                          className={
-                            on
-                              ? 'px-2 py-0.5 rounded-full text-xs bg-primary text-primary-foreground'
-                              : 'px-2 py-0.5 rounded-full text-xs bg-secondary hover:bg-accent'
-                          }
-                        >
-                          {tag}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    <span>Match</span>
-                    {['any', 'all'].map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => { playClick(); setLibraryTagMode(m) }}
-                        className={
-                          libraryTagMode === m
-                            ? 'px-2 py-0.5 rounded bg-primary text-primary-foreground'
-                            : 'px-2 py-0.5 rounded bg-secondary'
-                        }
-                      >
-                        {m}
-                      </button>
-                    ))}
-                    <span className="ml-2">Min heat</span>
-                    {[1, 2, 3, 4, 5].map((h) => (
-                      <button
-                        key={h}
-                        type="button"
-                        onClick={() => { playClick(); setLibraryMinHeat(h) }}
-                        className={
-                          libraryMinHeat === h
-                            ? 'w-6 h-6 rounded bg-orange-500 text-white text-[10px]'
-                            : 'w-6 h-6 rounded bg-secondary text-[10px]'
-                        }
-                      >
-                        {h}
-                      </button>
-                    ))}
-                    {libPreviewCount != null && (
-                      <span className="ml-auto text-foreground">
-                        {libPreviewCount} clip{libPreviewCount === 1 ? '' : 's'} match
-                      </span>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        <PathRow label="Output folder (optional)" value={outputFolder} placeholder="Leave empty → C:\\temp-pmv\\outputs\\…" onBrowse={browseOutput} onClear={() => setOutputFolder('')} busy={picking === 'out'} icon={FolderOpen} />
-      </section>
-
-      <section className="rounded-lg border border-border bg-card p-6 space-y-4">
-        <h2 className="font-serif text-lg">Format</h2>
-        <div className="flex flex-wrap items-start gap-8">
-          <div>
-            <label className="block text-sm text-muted-foreground mb-2">Aspect ratio</label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => update('aspect', '16:9')} className={chipClass(form.aspect === '16:9')}><Monitor size={16} /> 16:9</button>
-              <button type="button" onClick={() => update('aspect', '9:16')} className={chipClass(form.aspect === '9:16')}><Smartphone size={16} /> 9:16</button>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-muted-foreground mb-2">Resolution</label>
-            <div className="flex flex-wrap gap-2">
-              {['hd', 'fhd', '4k'].map((q) => (
-                <button key={q} type="button" onClick={() => update('quality', q)} className={chipClass(form.quality === q)}>
-                  {QUALITY_LABELS[q]}
-                  <span className="ml-1.5 opacity-70 text-xs">{RES_HINT[form.aspect]?.[q]}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">Output will be {resHint} @ {form.fps} fps</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-6">
-          <Toggle label="Zoom to fill (center crop)" hint="Scale up and crop so the frame is always full — recommended for 9:16" checked={form.zoom_to_fill} onChange={(v) => update('zoom_to_fill', v)} />
-        </div>
-
-      
-        <div>
-          <label className="block text-sm text-muted-foreground mb-2">Clip order</label>
-          <div className="flex flex-wrap gap-2">
-            {[
-              { id: 'random', label: 'Random', hint: 'Classic jumpy cuts' },
-              { id: 'forward', label: 'Chronological', hint: 'Always advance within each file' },
-              { id: 'sticky', label: 'Sticky', hint: 'Stay on one scene, play forward' },
-            ].map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                title={o.hint}
-                onClick={() => update('clip_order', o.id)}
-                className={chipClass(form.clip_order === o.id)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Sticky / Chronological avoid mixing the end of a scene with its beginning.
-          </p>
-        </div>
-</section>
-
-      
-      <section className="rounded-lg border border-border bg-card p-5 space-y-4">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="font-serif text-lg">Beat effects</h2>
-          <Toggle
-            label="Enable post-pass"
-            checked={!!form.effects?.enabled}
-            onChange={(v) => updateEffect('enabled', v)}
-          />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Applied after the PMV is built, timed to beatmap hits. Flash/strobe can trigger photosensitive reactions — leave it off unless you know you want it.
-        </p>
-        {form.effects?.enabled && (
-          <div className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Toggle label="Soft pulse" checked={!!form.effects.soft_pulse} onChange={(v) => updateEffect('soft_pulse', v)} hint="Gentle brightness on each beat" />
-              <Toggle label="Zoom punch" checked={!!form.effects.zoom_punch} onChange={(v) => updateEffect('zoom_punch', v)} hint="Brief center zoom on each beat" />
-              {form.effects.zoom_punch && (
-                <NumberField label="Zoom amount" value={form.effects.zoom_punch_amount ?? 1.06} step={0.01} min={1.01} max={1.2} onChange={(v) => updateEffect('zoom_punch_amount', v)} />
-              )}
-              <Toggle label="RGB split" checked={!!form.effects.rgb_split} onChange={(v) => updateEffect('rgb_split', v)} />
-              <Toggle
-                label="Flash / strobe"
-                checked={!!form.effects.flash}
-                onChange={(v) => updateEffect('flash', v)}
-                hint="⚠ Photosensitivity risk — capped rate"
-              />
-              <Toggle label="Pink diffuse glow" checked={!!form.effects.pink_glow} onChange={(v) => updateEffect('pink_glow', v)} hint="Persistent magenta lift + soft vignette" />
-            </div>
-            {form.effects.pink_glow && (
-              <div className="grid sm:grid-cols-2 gap-3">
-                <NumberField label="Glow strength" value={form.effects.pink_glow_strength} step={0.05} min={0} max={1} onChange={(v) => updateEffect('pink_glow_strength', v)} />
-                <NumberField label="Glow saturation" value={form.effects.pink_glow_saturation} step={0.05} min={0.5} max={2} onChange={(v) => updateEffect('pink_glow_saturation', v)} />
-              </div>
-            )}
-            {form.effects.flash && (
-              <div className="grid sm:grid-cols-2 gap-3">
-                <NumberField label="Flash strength" value={form.effects.flash_strength} step={0.05} min={0.1} max={1} onChange={(v) => updateEffect('flash_strength', v)} />
-                <NumberField label="Max flashes / sec" value={form.effects.flash_max_per_sec} step={1} min={1} max={12} onChange={(v) => updateEffect('flash_max_per_sec', v)} />
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-
-<section className="rounded-lg border border-border bg-card p-6 space-y-5">
-        <h2 className="font-serif text-lg">Options</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <NumberField label="Clip distance (s)" value={form.clip_dist} step={0.05} min={0.1} onChange={(v) => update('clip_dist', v, { silent: true })} />
-          <NumberField label="FPS" value={form.fps} step={1} min={15} max={60} onChange={(v) => update('fps', v, { silent: true })} />
-          <TextField label="Bitrate override" value={form.bitrate} onChange={(v) => update('bitrate', v, { silent: true })} hint="Leave empty for auto" />
-          <NumberField label="Threads" value={form.threads} step={1} min={1} max={32} onChange={(v) => update('threads', v, { silent: true })} />
-          <NumberField label="Max videos (0 = all)" value={form.num_vids} step={1} min={0} onChange={(v) => update('num_vids', v, { silent: true })} />
-        </div>
-        <div className="flex flex-wrap gap-6 pt-2">
-          {clipMode === 'all' && <Toggle label="Search recursive" checked={form.recurse} onChange={(v) => update('recurse', v)} />}
-          <Toggle label="GPU (CUDA / NVENC)" checked={form.cuda} onChange={(v) => update('cuda', v)} />
-          <Toggle label="Debug" checked={form.debug} onChange={(v) => update('debug', v)} />
-        </div>
-      </section>
+      <FormatSection form={form} update={update} resHint={resHint} />
+      <EffectsSection form={form} updateEffect={updateEffect} />
+      <OptionsSection form={form} update={update} clipMode={clipMode} />
 
       <div className="flex items-center gap-4">
         <button type="button" onClick={saveProject} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-md bg-secondary text-sm hover:bg-accent">
@@ -751,58 +493,5 @@ export default function GeneratePage() {
         <VideoModal src={videoUrl} title={status?.result?.output_video?.split(/[/\\]/).pop()} onClose={() => setPreviewOpen(false)} />
       )}
     </div>
-  )
-}
-
-function PathRow({ label, value, placeholder, onBrowse, onClear, busy, icon: Icon }) {
-  return (
-    <div>
-      {label && <label className="block text-sm text-muted-foreground mb-1.5">{label}</label>}
-      <div className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-dashed border-border bg-secondary/40 min-h-[44px] overflow-hidden">
-          {Icon && <Icon size={16} className="text-muted-foreground shrink-0" />}
-          <span className={value ? 'text-sm font-mono truncate' : 'text-sm text-muted-foreground truncate'} title={value || undefined}>
-            {value || placeholder}
-          </span>
-        </div>
-        <button type="button" onClick={onBrowse} disabled={!!busy} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-secondary text-sm hover:bg-accent transition-colors disabled:opacity-50 shrink-0">
-          {busy ? <Loader2 size={14} className="animate-spin" /> : 'Browse'}
-        </button>
-        {value && (
-          <button type="button" onClick={onClear} className="px-2 py-2 rounded-md text-sm text-muted-foreground hover:bg-secondary transition-colors shrink-0">Clear</button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function TextField({ label, value, onChange, hint }) {
-  return (
-    <div>
-      <label className="block text-sm text-muted-foreground mb-1.5">{label}</label>
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-      {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
-    </div>
-  )
-}
-
-function NumberField({ label, value, onChange, step = 1, min, max }) {
-  return (
-    <div>
-      <label className="block text-sm text-muted-foreground mb-1.5">{label}</label>
-      <input type="number" value={value} step={step} min={min} max={max} onChange={(e) => onChange(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-    </div>
-  )
-}
-
-function Toggle({ label, checked, onChange, hint }) {
-  return (
-    <label className="inline-flex flex-col gap-0.5 text-sm cursor-pointer select-none">
-      <span className="inline-flex items-center gap-2">
-        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="rounded border-border" />
-        {label}
-      </span>
-      {hint && <span className="text-xs text-muted-foreground pl-6">{hint}</span>}
-    </label>
   )
 }
