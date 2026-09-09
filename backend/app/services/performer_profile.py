@@ -18,7 +18,6 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -104,6 +103,21 @@ def _read_local_override(root: Path) -> Optional[dict]:
         return None
 
     name = (info.get("name") or root.name or "").strip()
+    extras = dict(info.get("extras") or {})
+    # Allow flat birthplace/ethnicity on info.json root
+    for k in ("ethnicity", "birthplace", "country", "nationality", "birthday"):
+        if info.get(k) and not extras.get(k):
+            extras[k] = info.get(k)
+    rating = info.get("rating")
+    try:
+        rating = float(rating) if rating is not None and rating != "" else None
+    except (TypeError, ValueError):
+        rating = None
+    age = info.get("age")
+    try:
+        age = int(age) if age is not None and age != "" else None
+    except (TypeError, ValueError):
+        age = None
     return {
         "name": name,
         "bio": (info.get("bio") or info.get("description") or "").strip(),
@@ -112,9 +126,12 @@ def _read_local_override(root: Path) -> Optional[dict]:
         "source": "local",
         "tpdb_id": info.get("tpdb_id") or info.get("id"),
         "query": info.get("query") or name,
-        "extras": dict(info.get("extras") or {}),
+        "extras": extras,
+        "rating": rating,
+        "age": age,
         "cached": True,
         "override": True,
+        "found": True,
     }
 
 
@@ -172,7 +189,6 @@ def _save_cache(key: str, data: dict, image_url: Optional[str], token: Optional[
         "query": data.get("query") or data.get("name") or "",
         "extras": dict(data.get("extras") or {}),
         "rating": data.get("rating"),
-        "age": data.get("age"),
         "source": "theporndb",
         "image_url": (urls[0] if urls else "") or image_url or data.get("image_url") or "",
         "image_urls": urls,
@@ -223,41 +239,6 @@ def _collect_image_urls(raw: dict) -> List[str]:
     return urls
 
 
-
-def _parse_birthday(val) -> Optional[str]:
-    if not val:
-        return None
-    s = str(val).strip()
-    if not s:
-        return None
-    # YYYY-MM-DD or YYYY
-    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%Y"):
-        try:
-            dt = datetime.strptime(s[:10] if fmt != "%Y" else s[:4], fmt)
-            if fmt == "%Y":
-                return f"{dt.year:04d}-01-01"
-            return dt.strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return None
-
-
-def _age_from_birthday(bday: Optional[str]) -> Optional[int]:
-    if not bday:
-        return None
-    try:
-        y, m, d = [int(x) for x in bday.split("-")[:3]]
-        born = date(y, m if m else 1, d if d else 1)
-    except Exception:
-        return None
-    today = date.today()
-    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
-    if age < 18 or age > 100:
-        # still show if plausible adult range; clamp weird parses
-        if age < 0 or age > 120:
-            return None
-    return age
-
 def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
     extras = raw.get("extras") if isinstance(raw.get("extras"), dict) else {}
     image_urls = _collect_image_urls(raw)
@@ -271,21 +252,11 @@ def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
         rating = float(rating) if rating is not None and rating != "" else None
     except (TypeError, ValueError):
         rating = None
-    # Display-relevant extras only (no measurements). Birthday drives age.
+    # Keep only display-relevant extras (race + place); measurements intentionally omitted
     slim_extras = {}
-    for k in ("ethnicity", "country", "birthplace", "nationality", "birthday"):
+    for k in ("ethnicity", "country", "birthplace", "nationality"):
         if extras.get(k):
             slim_extras[k] = extras.get(k)
-    # Top-level birthday sometimes appears outside extras
-    bday = _parse_birthday(
-        extras.get("birthday")
-        or raw.get("birthday")
-        or raw.get("date_of_birth")
-        or extras.get("date_of_birth")
-    )
-    if bday:
-        slim_extras["birthday"] = bday
-    age = _age_from_birthday(bday)
     return {
         "name": raw.get("name") or raw.get("full_name") or query,
         "bio": (bio or "").strip(),
@@ -293,7 +264,6 @@ def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
         "tpdb_id": raw.get("_id") or raw.get("id") or raw.get("slug"),
         "query": query,
         "rating": rating,
-        "age": age,
         "extras": slim_extras,
         "image_url": image,
         "image_urls": image_urls,
@@ -438,6 +408,78 @@ def get_profile_for_library(lib_id: str, *, force_refresh: bool = False) -> dict
     saved["found"] = True
     saved["library_id"] = lib_id
     return saved
+
+
+
+
+def save_local_override(lib_id: str, payload: dict) -> dict:
+    """Write info.json into the library root; local override always wins on next load."""
+    lib = lib_store.load_library(lib_id)
+    if not lib:
+        raise ValueError("Library not found")
+    root = Path(lib.root_path)
+    if not root.is_dir():
+        raise ValueError(f"Library root missing: {lib.root_path}")
+
+    extras_in = payload.get("extras") if isinstance(payload.get("extras"), dict) else {}
+    extras = {}
+    for k in ("ethnicity", "birthplace", "country", "nationality", "birthday"):
+        v = extras_in.get(k) if k in extras_in else payload.get(k)
+        if v is not None and str(v).strip() != "":
+            extras[k] = str(v).strip()
+
+    aliases = payload.get("aliases") or []
+    if isinstance(aliases, str):
+        aliases = [a.strip() for a in aliases.split(",") if a.strip()]
+    else:
+        aliases = [str(a).strip() for a in aliases if str(a).strip()]
+
+    rating = payload.get("rating")
+    try:
+        rating = float(rating) if rating is not None and rating != "" else None
+    except (TypeError, ValueError):
+        rating = None
+
+    age = payload.get("age")
+    try:
+        age = int(age) if age is not None and age != "" else None
+    except (TypeError, ValueError):
+        age = None
+
+    data = {
+        "name": (payload.get("name") or lib.name or root.name or "").strip(),
+        "bio": (payload.get("bio") or "").strip(),
+        "aliases": aliases,
+        "query": (payload.get("query") or payload.get("name") or lib.name or "").strip(),
+        "extras": extras,
+    }
+    if rating is not None:
+        data["rating"] = rating
+    if age is not None:
+        data["age"] = age
+    if payload.get("tpdb_id"):
+        data["tpdb_id"] = payload.get("tpdb_id")
+    if payload.get("image"):
+        data["image"] = payload.get("image")
+
+    info_path = root / "info.json"
+    info_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    # Return resolved profile (override path)
+    out = get_profile_for_library(lib_id, force_refresh=False)
+    out["info_path"] = str(info_path.resolve())
+    return out
+
+
+def clear_local_override(lib_id: str) -> dict:
+    lib = lib_store.load_library(lib_id)
+    if not lib:
+        raise ValueError("Library not found")
+    root = Path(lib.root_path)
+    info_path = root / "info.json"
+    if info_path.is_file():
+        info_path.unlink()
+    return get_profile_for_library(lib_id, force_refresh=False)
 
 
 def media_path_allowed(path: str) -> bool:

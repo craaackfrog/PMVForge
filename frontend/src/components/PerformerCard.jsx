@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { Loader2, RefreshCw, User, Star, ChevronLeft, ChevronRight } from 'lucide-react'
 import { playTap, playError, playClick } from '../lib/sounds'
 import ImageModal from './ImageModal'
+import PerformerEditModal from './PerformerEditModal'
 
 function imageUrl(path) {
   if (!path) return null
@@ -26,44 +27,16 @@ const COUNTRY_FLAG = {
 
 function flagFor(place) {
   if (!place) return ''
-  // Prefer the country segment of a birthplace string: "City, Region, Country"
-  const parts = String(place)
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean)
-  const candidates = [...parts].reverse()
-  if (parts.length) candidates.push(parts[parts.length - 1])
-  candidates.push(String(place).trim())
-  for (const c of candidates) {
-    const s = c.toLowerCase()
-    if (COUNTRY_FLAG[s]) return COUNTRY_FLAG[s]
+  const s = String(place).toLowerCase().trim()
+  if (COUNTRY_FLAG[s]) return COUNTRY_FLAG[s]
+  const parts = s.split(',').map((x) => x.trim()).filter(Boolean)
+  for (let i = parts.length - 1; i >= 0; i--) {
+    if (COUNTRY_FLAG[parts[i]]) return COUNTRY_FLAG[parts[i]]
   }
-  // Partial match only on the last comma segment (country), never whole string first
-  const last = (parts[parts.length - 1] || String(place)).toLowerCase()
-  // longer keys first so "united states" wins over "us"
-  const keys = Object.keys(COUNTRY_FLAG).sort((a, b) => b.length - a.length)
-  for (const k of keys) {
-    if (last === k || last.endsWith(k) || last.includes(k)) return COUNTRY_FLAG[k]
+  for (const [k, flag] of Object.entries(COUNTRY_FLAG)) {
+    if (s.includes(k)) return flag
   }
   return ''
-}
-
-function ageFromProfile(profile) {
-  if (profile?.age != null && profile.age !== '') {
-    const n = Number(profile.age)
-    if (!Number.isNaN(n) && n > 0) return n
-  }
-  const bday = profile?.extras?.birthday
-  if (!bday) return null
-  const m = String(bday).match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (!m) return null
-  const born = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-  if (Number.isNaN(born.getTime())) return null
-  const today = new Date()
-  let age = today.getFullYear() - born.getFullYear()
-  const md = today.getMonth() - born.getMonth()
-  if (md < 0 || (md === 0 && today.getDate() < born.getDate())) age -= 1
-  return age > 0 && age < 120 ? age : null
 }
 
 export default function PerformerCard({ libraryId }) {
@@ -72,6 +45,8 @@ export default function PerformerCard({ libraryId }) {
   const [refreshing, setRefreshing] = useState(false)
   const [slide, setSlide] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const eggRef = useState({ count: 0, timer: null })[0]
 
   useEffect(() => {
     if (!libraryId) {
@@ -125,17 +100,31 @@ export default function PerformerCard({ libraryId }) {
 
   if (!libraryId) return null
 
+  function onEggClick(e) {
+    // Only count clicks on blank padding / text chrome — not interactive controls
+    const tag = (e.target.tagName || '').toLowerCase()
+    if (tag === 'button' || tag === 'img' || tag === 'a' || tag === 'input' || tag === 'textarea') return
+    if (e.target.closest('button')) return
+    eggRef.count += 1
+    if (eggRef.timer) window.clearTimeout(eggRef.timer)
+    eggRef.timer = window.setTimeout(() => { eggRef.count = 0 }, 2500)
+    if (eggRef.count >= 5) {
+      eggRef.count = 0
+      playTap()
+      setEditOpen(true)
+    }
+  }
+
   const extras = profile?.extras || {}
   const race = extras.ethnicity || null
-  const place = extras.birthplace || null
-  const flag = flagFor(place)
-  const age = ageFromProfile(profile)
+  const place = extras.birthplace || extras.country || extras.nationality || null
+  const flag = flagFor(extras.country || extras.nationality || extras.birthplace)
   const rating = profile?.rating != null && profile.rating !== '' ? Number(profile.rating) : null
 
   const current = gallery.length ? gallery[slide % gallery.length] : null
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden" onClick={onEggClick}>
       <div className="relative w-full aspect-[2/3] bg-secondary/40 overflow-hidden">
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -213,26 +202,19 @@ export default function PerformerCard({ libraryId }) {
           </button>
         </div>
 
-        <div className="space-y-1 text-xs text-muted-foreground">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {rating != null && !Number.isNaN(rating) && (
-              <span className="inline-flex items-center gap-0.5 text-amber-400/90">
-                <Star size={12} className="fill-current" />
-                {rating.toFixed(1)}
-              </span>
-            )}
-            {race && <span>{race}</span>}
-            {age != null && <span>{age}</span>}
-          </div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          {rating != null && !Number.isNaN(rating) && (
+            <span className="inline-flex items-center gap-0.5 text-amber-400/90">
+              <Star size={12} className="fill-current" />
+              {rating.toFixed(1)}
+            </span>
+          )}
+          {race && <span>{race}</span>}
           {(place || flag) && (
-            <div className="inline-flex items-center gap-1.5">
-              {flag ? (
-                <span className="flag-emoji text-base leading-none" aria-hidden>
-                  {flag}
-                </span>
-              ) : null}
+            <span className="inline-flex items-center gap-1">
+              {flag && <span aria-hidden>{flag}</span>}
               {place && <span>{place}</span>}
-            </div>
+            </span>
           )}
         </div>
 
@@ -256,6 +238,14 @@ export default function PerformerCard({ libraryId }) {
           index={slide % Math.max(gallery.length, 1)}
           title={profile?.name}
           onClose={() => setModalOpen(false)}
+        />
+      )}
+      {editOpen && (
+        <PerformerEditModal
+          libraryId={libraryId}
+          profile={profile}
+          onClose={() => setEditOpen(false)}
+          onSaved={(data) => setProfile(data)}
         />
       )}
     </div>

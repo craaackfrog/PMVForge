@@ -172,6 +172,31 @@ async def get_performer_profile(lib_id: str, refresh: bool = False):
         raise HTTPException(500, str(e))
 
 
+
+
+@router.put("/{lib_id}/performer/override")
+async def put_performer_override(lib_id: str, body: dict):
+    """Save local info.json override for this library's performer card."""
+    from ..services import performer_profile as pp
+    try:
+        return pp.save_local_override(lib_id, body or {})
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.delete("/{lib_id}/performer/override")
+async def delete_performer_override(lib_id: str):
+    from ..services import performer_profile as pp
+    try:
+        return pp.clear_local_override(lib_id)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.post("/{lib_id}/performer/refresh")
 async def refresh_performer_profile(lib_id: str):
     from ..services import performer_profile as pp
