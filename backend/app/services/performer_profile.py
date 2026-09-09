@@ -104,8 +104,7 @@ def _read_local_override(root: Path) -> Optional[dict]:
 
     name = (info.get("name") or root.name or "").strip()
     extras = dict(info.get("extras") or {})
-    # Allow flat birthplace/ethnicity on info.json root
-    for k in ("ethnicity", "birthplace", "country", "nationality", "birthday"):
+    for k in ("ethnicity", "birthplace", "country", "nationality", "birthday", "flag_country", "flag"):
         if info.get(k) and not extras.get(k):
             extras[k] = info.get(k)
     rating = info.get("rating")
@@ -254,7 +253,7 @@ def _normalize_tpdb_performer(raw: dict, query: str) -> dict:
         rating = None
     # Keep only display-relevant extras (race + place); measurements intentionally omitted
     slim_extras = {}
-    for k in ("ethnicity", "country", "birthplace", "nationality"):
+    for k in ("ethnicity", "country", "birthplace", "nationality", "birthday", "flag_country", "flag"):
         if extras.get(k):
             slim_extras[k] = extras.get(k)
     return {
@@ -423,7 +422,7 @@ def save_local_override(lib_id: str, payload: dict) -> dict:
 
     extras_in = payload.get("extras") if isinstance(payload.get("extras"), dict) else {}
     extras = {}
-    for k in ("ethnicity", "birthplace", "country", "nationality", "birthday"):
+    for k in ("ethnicity", "birthplace", "country", "nationality", "birthday", "flag_country", "flag"):
         v = extras_in.get(k) if k in extras_in else payload.get(k)
         if v is not None and str(v).strip() != "":
             extras[k] = str(v).strip()
@@ -439,7 +438,6 @@ def save_local_override(lib_id: str, payload: dict) -> dict:
         rating = float(rating) if rating is not None and rating != "" else None
     except (TypeError, ValueError):
         rating = None
-
     age = payload.get("age")
     try:
         age = int(age) if age is not None and age != "" else None
@@ -464,8 +462,6 @@ def save_local_override(lib_id: str, payload: dict) -> dict:
 
     info_path = root / "info.json"
     info_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-    # Return resolved profile (override path)
     out = get_profile_for_library(lib_id, force_refresh=False)
     out["info_path"] = str(info_path.resolve())
     return out
@@ -480,7 +476,6 @@ def clear_local_override(lib_id: str) -> dict:
     if info_path.is_file():
         info_path.unlink()
     return get_profile_for_library(lib_id, force_refresh=False)
-
 
 def media_path_allowed(path: str) -> bool:
     """True if path is under performer_cache or a library root cover."""

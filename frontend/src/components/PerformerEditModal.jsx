@@ -4,9 +4,6 @@ import { playTap, playDone, playError } from '../lib/sounds'
 
 const EXIT_MS = 220
 
-/**
- * Manual performer bio editor — writes library-root info.json override.
- */
 export default function PerformerEditModal({ libraryId, profile, onClose, onSaved }) {
   const [visible, setVisible] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -21,6 +18,7 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
     aliases: Array.isArray(profile?.aliases) ? profile.aliases.join(', ') : '',
     ethnicity: extras.ethnicity || '',
     birthplace: extras.birthplace || '',
+    flag_country: extras.flag_country || extras.flag || '',
     birthday: extras.birthday || '',
     rating: profile?.rating ?? '',
     age: profile?.age ?? '',
@@ -65,6 +63,7 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
         extras: {
           ethnicity: form.ethnicity,
           birthplace: form.birthplace,
+          flag_country: form.flag_country,
           birthday: form.birthday,
         },
         tpdb_id: profile?.tpdb_id,
@@ -141,7 +140,14 @@ export default function PerformerEditModal({ libraryId, profile, onClose, onSave
             label="Birthplace"
             value={form.birthplace}
             onChange={(v) => update('birthplace', v)}
-            hint='Use "City, Country" — flag is taken from the last segment (e.g. "Kyiv, Ukraine").'
+            hint='Display text, e.g. "Kyiv, Ukraine".'
+          />
+          <Field
+            label="Flag country"
+            value={form.flag_country}
+            onChange={(v) => update('flag_country', v)}
+            placeholder="Ukraine"
+            hint="Country name used for the flag emoji only (overrides birthplace for the flag). Examples: Ukraine, Brazil, United States."
           />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Birthday" value={form.birthday} onChange={(v) => update('birthday', v)} placeholder="YYYY-MM-DD" />

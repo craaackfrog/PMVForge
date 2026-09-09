@@ -101,7 +101,6 @@ export default function PerformerCard({ libraryId }) {
   if (!libraryId) return null
 
   function onEggClick(e) {
-    // Only count clicks on blank padding / text chrome — not interactive controls
     const tag = (e.target.tagName || '').toLowerCase()
     if (tag === 'button' || tag === 'img' || tag === 'a' || tag === 'input' || tag === 'textarea') return
     if (e.target.closest('button')) return
@@ -115,10 +114,13 @@ export default function PerformerCard({ libraryId }) {
     }
   }
 
+
   const extras = profile?.extras || {}
   const race = extras.ethnicity || null
-  const place = extras.birthplace || extras.country || extras.nationality || null
-  const flag = flagFor(extras.country || extras.nationality || extras.birthplace)
+  const place = extras.birthplace || null
+  // Explicit flag_country (manual override) wins; else derive from birthplace only
+  const flagSource = extras.flag_country || extras.flag || place
+  const flag = flagFor(flagSource)
   const rating = profile?.rating != null && profile.rating !== '' ? Number(profile.rating) : null
 
   const current = gallery.length ? gallery[slide % gallery.length] : null
@@ -212,7 +214,7 @@ export default function PerformerCard({ libraryId }) {
           {race && <span>{race}</span>}
           {(place || flag) && (
             <span className="inline-flex items-center gap-1">
-              {flag && <span aria-hidden>{flag}</span>}
+              {flag && <span className="flag-emoji text-base leading-none" aria-hidden>{flag}</span>}
               {place && <span>{place}</span>}
             </span>
           )}
