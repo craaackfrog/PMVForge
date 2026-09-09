@@ -37,14 +37,91 @@ class EffectsOptions:
     rgb_split: bool = False
     rgb_split_px: float = 8.0
     rgb_split_ms: float = 120
+    rgb_split_static: bool = False
 
+    # Diffuse glow (tint + brightness / contrast) — was pink_glow
+    diffuse_glow: bool = False
+    diffuse_glow_color: str = "#ff4da6"
+    diffuse_glow_strength: float = 0.35
+    diffuse_glow_saturation: float = 1.15
+    diffuse_glow_brightness: float = 0.04
+    diffuse_glow_contrast: float = 1.0
+
+    # Backward-compat aliases still accepted when parsing from dict
     pink_glow: bool = False
     pink_glow_strength: float = 0.35
     pink_glow_saturation: float = 1.15
 
+    vignette: bool = False
+    vignette_intensity: float = 0.5
+    vignette_color: str = "#000000"
+
+    chromatic_aberration: bool = False
+    chromatic_aberration_amount: float = 1.5
+
+    camera_sway: bool = False
+    camera_sway_amount: float = 6.0
+    camera_sway_speed: float = 0.7
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def effects_from_dict(fx_raw: dict) -> EffectsOptions:
+    """Build EffectsOptions from a frontend / API dict (with legacy keys)."""
+    fx_raw = fx_raw or {}
+    diffuse = bool(fx_raw.get("diffuse_glow", fx_raw.get("pink_glow", False)))
+    return EffectsOptions(
+        enabled=bool(fx_raw.get("enabled", True)),
+        soft_pulse=bool(fx_raw.get("soft_pulse", True)),
+        soft_pulse_strength=float(fx_raw.get("soft_pulse_strength", 0.7)),
+        soft_pulse_ms=float(fx_raw.get("soft_pulse_ms", 150)),
+        flash=bool(fx_raw.get("flash", False)),
+        flash_strength=float(fx_raw.get("flash_strength", 0.55)),
+        flash_ms=float(fx_raw.get("flash_ms", 40)),
+        flash_max_per_sec=float(fx_raw.get("flash_max_per_sec", 8)),
+        zoom_punch=bool(fx_raw.get("zoom_punch", True)),
+        zoom_punch_amount=float(fx_raw.get("zoom_punch_amount", 1.06)),
+        zoom_punch_ms=float(fx_raw.get("zoom_punch_ms", 150)),
+        rgb_split=bool(fx_raw.get("rgb_split", False)),
+        rgb_split_px=float(fx_raw.get("rgb_split_px", 8)),
+        rgb_split_ms=float(fx_raw.get("rgb_split_ms", 120)),
+        rgb_split_static=bool(fx_raw.get("rgb_split_static", False)),
+        diffuse_glow=diffuse,
+        diffuse_glow_color=str(fx_raw.get("diffuse_glow_color", "#ff4da6")),
+        diffuse_glow_strength=float(
+            fx_raw.get("diffuse_glow_strength", fx_raw.get("pink_glow_strength", 0.35))
+        ),
+        diffuse_glow_saturation=float(
+            fx_raw.get("diffuse_glow_saturation", fx_raw.get("pink_glow_saturation", 1.15))
+        ),
+        diffuse_glow_brightness=float(fx_raw.get("diffuse_glow_brightness", 0.04)),
+        diffuse_glow_contrast=float(fx_raw.get("diffuse_glow_contrast", 1.0)),
+        vignette=bool(fx_raw.get("vignette", False)),
+        vignette_intensity=float(fx_raw.get("vignette_intensity", 0.5)),
+        vignette_color=str(fx_raw.get("vignette_color", "#000000")),
+        chromatic_aberration=bool(fx_raw.get("chromatic_aberration", False)),
+        chromatic_aberration_amount=float(fx_raw.get("chromatic_aberration_amount", 1.5)),
+        camera_sway=bool(fx_raw.get("camera_sway", False)),
+        camera_sway_amount=float(fx_raw.get("camera_sway_amount", 6.0)),
+        camera_sway_speed=float(fx_raw.get("camera_sway_speed", 0.7)),
+    )
+
+
+def _parse_hex_color(color: str) -> Tuple[float, float, float]:
+    """Return RGB in 0..1."""
+    h = (color or "#ffffff").strip().lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) != 6:
+        return 1.0, 1.0, 1.0
+    try:
+        r = int(h[0:2], 16) / 255.0
+        g = int(h[2:4], 16) / 255.0
+        b = int(h[4:6], 16) / 255.0
+        return r, g, b
+    except Exception:
+        return 1.0, 1.0, 1.0
 
 
 def _run(cmd: List[str], timeout: int = 7200) -> Tuple[int, str]:
@@ -85,16 +162,47 @@ def _near_beat(t: float, beats: np.ndarray, half_win: float) -> bool:
 
 def _build_static_vf(opts: EffectsOptions) -> str:
     filters: List[str] = []
-    if opts.pink_glow and opts.pink_glow_strength > 0:
-        s = max(0.0, min(1.0, float(opts.pink_glow_strength)))
-        sat = max(0.5, min(2.0, float(opts.pink_glow_saturation)))
-        filters.append(
-            f"colorbalance=rs={0.15 * s:.3f}:gs={-0.05 * s:.3f}:bs={0.08 * s:.3f}:"
-            f"rm={0.20 * s:.3f}:gm={-0.08 * s:.3f}:bm={0.12 * s:.3f}:"
-            f"rh={0.18 * s:.3f}:gh={-0.06 * s:.3f}:bh={0.10 * s:.3f}"
+
+    glow_on = bool(opts.diffuse_glow or opts.pink_glow)
+    if glow_on:
+        s = float(opts.diffuse_glow_strength if opts.diffuse_glow else opts.pink_glow_strength)
+        sat = float(
+            opts.diffuse_glow_saturation if opts.diffuse_glow else opts.pink_glow_saturation
         )
-        filters.append(f"eq=saturation={sat:.3f}:brightness={0.04 * s:.3f}")
-        filters.append(f"vignette=PI/{max(2.5, 4 + 2 * (1 - s)):.2f}")
+        bri = float(getattr(opts, "diffuse_glow_brightness", 0.04))
+        con = float(getattr(opts, "diffuse_glow_contrast", 1.0))
+        cr, cg, cb = _parse_hex_color(getattr(opts, "diffuse_glow_color", "#ff4da6"))
+        # shift midtones toward chosen color, scaled by strength (no hard clamp)
+        rs = (cr - 0.5) * s * 0.9
+        gs = (cg - 0.5) * s * 0.9
+        bs = (cb - 0.5) * s * 0.9
+        filters.append(
+            f"colorbalance=rs={rs:.4f}:gs={gs:.4f}:bs={bs:.4f}:"
+            f"rm={rs:.4f}:gm={gs:.4f}:bm={bs:.4f}:"
+            f"rh={rs * 0.8:.4f}:gh={gs * 0.8:.4f}:bh={bs * 0.8:.4f}"
+        )
+        filters.append(
+            f"eq=saturation={sat:.4f}:brightness={bri:.4f}:contrast={con:.4f}"
+        )
+
+    if opts.vignette and float(opts.vignette_intensity) > 0:
+        inten = float(opts.vignette_intensity)
+        # larger intensity → stronger darkening (smaller PI divisor)
+        angle = max(0.35, 5.5 - inten * 3.5)
+        filters.append(f"vignette=PI/{angle:.3f}")
+        vr, vg, vb = _parse_hex_color(opts.vignette_color)
+        # mild edge color bias when vignette color isn't pure black
+        if (vr + vg + vb) > 0.05:
+            vs = min(1.5, inten) * 0.25
+            filters.append(
+                f"colorbalance=rs={(vr - 0.5) * vs:.4f}:gs={(vg - 0.5) * vs:.4f}:bs={(vb - 0.5) * vs:.4f}"
+            )
+
+    if opts.rgb_split and opts.rgb_split_static:
+        px = int(round(float(opts.rgb_split_px)))
+        if px != 0:
+            # chromashift: rh/bh in pixels (ffmpeg filter)
+            filters.append(f"rgbashift=rh={px}:bh={-px}:rv=0:bv=0")
 
     if not filters:
         return ""
@@ -103,11 +211,14 @@ def _build_static_vf(opts: EffectsOptions) -> str:
 
 
 def _has_timed(opts: EffectsOptions) -> bool:
+    rgb_timed = bool(opts.rgb_split) and not bool(opts.rgb_split_static)
     return bool(
         opts.soft_pulse
         or opts.flash
         or opts.zoom_punch
-        or opts.rgb_split
+        or rgb_timed
+        or opts.chromatic_aberration
+        or opts.camera_sway
     )
 
 
@@ -220,17 +331,87 @@ def _probe(path: str) -> Tuple[int, int, float]:
 
 
 def _rgb_shift(frame: np.ndarray, px: int) -> np.ndarray:
-    """Simple horizontal channel shift (R right, B left)."""
-    if px <= 0:
+    """Horizontal channel shift (R right, B left). px may be large."""
+    px = int(px)
+    if px == 0:
         return frame
+    if px < 0:
+        px = -px
+        # swap direction
+        out = frame.copy()
+        out[:, :-px, 0] = frame[:, px:, 0]
+        out[:, -px:, 0] = frame[:, -px:, 0]
+        out[:, px:, 2] = frame[:, :-px, 2]
+        out[:, :px, 2] = frame[:, :px, 2]
+        return out
     out = frame.copy()
-    # R channel
     out[:, px:, 0] = frame[:, :-px, 0]
     out[:, :px, 0] = frame[:, :px, 0]
-    # B channel
     out[:, :-px, 2] = frame[:, px:, 2]
     out[:, -px:, 2] = frame[:, -px:, 2]
     return out
+
+
+def _chromatic_aberration(frame: np.ndarray, amount: float) -> np.ndarray:
+    """Radial chromatic aberration: R zooms out, B zooms in from center."""
+    amount = float(amount)
+    if abs(amount) < 0.001:
+        return frame
+    h, w = frame.shape[:2]
+    # scale factors — amount in ~pixels at the edge
+    # convert to relative scale: edge shift ≈ amount px → scale = 1 + amount/(0.5*diag)
+    diag = 0.5 * (w ** 2 + h ** 2) ** 0.5
+    delta = amount / max(diag, 1.0)
+    scale_r = 1.0 + delta
+    scale_b = max(0.5, 1.0 - delta)
+
+    def _scale_channel(ch: np.ndarray, scale: float) -> np.ndarray:
+        if abs(scale - 1.0) < 1e-4:
+            return ch
+        nh = max(2, int(h / scale))
+        nw = max(2, int(w / scale))
+        nh -= nh % 2
+        nw -= nw % 2
+        nh = max(2, min(h, nh))
+        nw = max(2, min(w, nw))
+        y0 = (h - nh) // 2
+        x0 = (w - nw) // 2
+        crop = ch[y0:y0 + nh, x0:x0 + nw]
+        ys = (np.linspace(0, nh - 1, h)).astype(np.int32)
+        xs = (np.linspace(0, nw - 1, w)).astype(np.int32)
+        return crop[ys][:, xs]
+
+    out = frame.copy()
+    out[:, :, 0] = _scale_channel(frame[:, :, 0], scale_r)
+    out[:, :, 2] = _scale_channel(frame[:, :, 2], scale_b)
+    return out
+
+
+def _camera_sway(frame: np.ndarray, t: float, amount: float, speed: float) -> np.ndarray:
+    """Handheld-like crop sway. amount ≈ max pixel shift."""
+    amount = float(amount)
+    speed = float(speed) if speed else 0.7
+    if abs(amount) < 0.01:
+        return frame
+    h, w = frame.shape[:2]
+    # keep a margin so we can shift
+    margin = int(min(w, h, max(2, abs(amount) * 2)))
+    if margin < 2 or w <= margin * 2 or h <= margin * 2:
+        return frame
+    ox = int(round(amount * np.sin(2 * np.pi * speed * t)))
+    oy = int(round(amount * 0.65 * np.cos(2 * np.pi * speed * 0.83 * t)))
+    ox = int(max(-margin, min(margin, ox)))
+    oy = int(max(-margin, min(margin, oy)))
+    # center crop then offset
+    cw, ch_ = w - 2 * margin, h - 2 * margin
+    x0 = margin + ox
+    y0 = margin + oy
+    x0 = max(0, min(w - cw, x0))
+    y0 = max(0, min(h - ch_, y0))
+    crop = frame[y0:y0 + ch_, x0:x0 + cw]
+    ys = (np.linspace(0, ch_ - 1, h)).astype(np.int32)
+    xs = (np.linspace(0, cw - 1, w)).astype(np.int32)
+    return crop[ys][:, xs]
 
 
 def _apply_timed_frames(
@@ -252,10 +433,14 @@ def _apply_timed_frames(
     punch_half = max(0.02, opts.zoom_punch_ms / 2000.0)
     rgb_half = max(0.02, opts.rgb_split_ms / 2000.0)
 
-    pulse_amt = max(0.0, min(0.6, float(opts.soft_pulse_strength)))
-    flash_amt = max(0.0, min(1.0, float(opts.flash_strength)))
+    pulse_amt = max(0.0, float(opts.soft_pulse_strength))
+    flash_amt = max(0.0, float(opts.flash_strength))
     # zoom_punch_amount applied per-frame as scale
-    rgb_px = int(max(1, min(16, float(opts.rgb_split_px))))
+    rgb_px = int(round(float(opts.rgb_split_px)))
+    rgb_timed = bool(opts.rgb_split) and not bool(opts.rgb_split_static)
+    ca_amt = float(getattr(opts, "chromatic_aberration_amount", 0.0) or 0.0)
+    sway_amp = float(getattr(opts, "camera_sway_amount", 0.0) or 0.0)
+    sway_spd = float(getattr(opts, "camera_sway_speed", 0.7) or 0.7)
 
     dec = subprocess.Popen(
         [
@@ -309,12 +494,14 @@ def _apply_timed_frames(
             frame = np.clip(frame.astype(np.float32) + 255.0 * flash_amt, 0, 255).astype(np.uint8)
 
         if opts.zoom_punch and _near_beat(t, pulse_beats, punch_half):
-            scale = max(1.0, min(1.25, float(opts.zoom_punch_amount)))
+            scale = max(1.0, float(opts.zoom_punch_amount))
             if scale > 1.001:
                 nh, nw = int(h / scale), int(w / scale)
                 nh -= nh % 2
                 nw -= nw % 2
-                if nh > 0 and nw > 0:
+                nh = max(2, nh)
+                nw = max(2, nw)
+                if nh < h and nw < w:
                     y0 = (h - nh) // 2
                     x0 = (w - nw) // 2
                     crop = frame[y0:y0 + nh, x0:x0 + nw]
@@ -322,8 +509,14 @@ def _apply_timed_frames(
                     xs = (np.linspace(0, nw - 1, w)).astype(np.int32)
                     frame = crop[ys][:, xs]
 
-        if opts.rgb_split and _near_beat(t, pulse_beats, rgb_half):
-            frame = _rgb_shift(frame, rgb_px)
+        if rgb_timed and rgb_px != 0 and _near_beat(t, pulse_beats, rgb_half):
+            frame = _rgb_shift(frame, abs(rgb_px))
+
+        if opts.chromatic_aberration and abs(ca_amt) > 0.001:
+            frame = _chromatic_aberration(frame, ca_amt)
+
+        if opts.camera_sway and abs(sway_amp) > 0.01:
+            frame = _camera_sway(frame, t, sway_amp, sway_spd)
 
         try:
             enc.stdin.write(frame.tobytes())

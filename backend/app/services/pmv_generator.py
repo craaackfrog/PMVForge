@@ -23,7 +23,7 @@ from typing import Callable, List, Optional, Tuple
 from ..config import PROJECT_NAME, get_temp_dir
 from .temp_cleanup import cleanup_job_work
 from .user_settings import load_settings
-from .effects_pipeline import EffectsOptions, apply_effects
+from .effects_pipeline import EffectsOptions, apply_effects, effects_from_dict
 from .osu_editor import parse_osu_file
 
 VIDEO_EXTS = {".mp4", ".wmv", ".mov", ".m4v", ".mpg", ".mpeg", ".avi", ".flv", ".mkv", ".webm"}
@@ -706,25 +706,7 @@ class PMVGenerator:
                     pct = int(round(frac * 100))
                     self._progress(f"Applying beat effects… {pct}%", 0.9 + 0.08 * frac)
 
-                fx = EffectsOptions(
-                    enabled=True,
-                    soft_pulse=bool(fx_raw.get("soft_pulse", True)),
-                    soft_pulse_strength=float(fx_raw.get("soft_pulse_strength", 0.12)),
-                    soft_pulse_ms=float(fx_raw.get("soft_pulse_ms", 80)),
-                    flash=bool(fx_raw.get("flash", False)),
-                    flash_strength=float(fx_raw.get("flash_strength", 0.55)),
-                    flash_ms=float(fx_raw.get("flash_ms", 40)),
-                    flash_max_per_sec=float(fx_raw.get("flash_max_per_sec", 8)),
-                    zoom_punch=bool(fx_raw.get("zoom_punch", True)),
-                    zoom_punch_amount=float(fx_raw.get("zoom_punch_amount", 1.06)),
-                    zoom_punch_ms=float(fx_raw.get("zoom_punch_ms", 100)),
-                    rgb_split=bool(fx_raw.get("rgb_split", False)),
-                    rgb_split_px=float(fx_raw.get("rgb_split_px", 4)),
-                    rgb_split_ms=float(fx_raw.get("rgb_split_ms", 70)),
-                    pink_glow=bool(fx_raw.get("pink_glow", False)),
-                    pink_glow_strength=float(fx_raw.get("pink_glow_strength", 0.35)),
-                    pink_glow_saturation=float(fx_raw.get("pink_glow_saturation", 1.15)),
-                )
+                fx = effects_from_dict(fx_raw)
                 fx_out = work_dir / "effects.mp4"
                 apply_effects(
                     str(final_path),
