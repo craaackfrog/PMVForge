@@ -14,6 +14,7 @@ import {
   HelpCircle,
   ArrowDownAZ,
   ArrowUpAZ,
+  Filter,
   SlidersHorizontal,
 } from 'lucide-react'
 import { playClick, playTap, playDone, playError } from '../lib/sounds'
@@ -21,6 +22,7 @@ import VideoModal from '../components/VideoModal'
 import SceneMatchModal from '../components/SceneMatchModal'
 import PerformerCard from '../components/PerformerCard'
 import ClipCard from '../components/ClipCard'
+import ClipEditModal from '../components/ClipEditModal'
 import { nativePick } from '../lib/nativePick'
 import { cn } from '../lib/utils'
 
@@ -55,9 +57,9 @@ export default function LibrariesPage() {
   const [showHelp, setShowHelp] = useState(false)
   const [folderSort, setFolderSort] = useState('az') // az | za
   const [filterOpen, setFilterOpen] = useState(false)
+  const [folderFilterOpen, setFolderFilterOpen] = useState(false)
   const [unmatchedOnly, setUnmatchedOnly] = useState(false)
-  const [viewMode, setViewMode] = useState('grid') // grid | split
-  const [detailClip, setDetailClip] = useState(null)
+  const [editClip, setEditClip] = useState(null)
   const [folderQuery, setFolderQuery] = useState('')
   const [folderEthnicity, setFolderEthnicity] = useState('')
   const [folderCountry, setFolderCountry] = useState('')
@@ -106,7 +108,6 @@ export default function LibrariesPage() {
 
   useEffect(() => {
     loadClips()
-    setDetailClip(null)
   }, [loadClips])
 
   async function addLibrary() {
@@ -198,7 +199,6 @@ export default function LibrariesPage() {
       body: JSON.stringify({ path, heat }),
     })
     setClips((prev) => prev.map((c) => (c.path === path ? { ...c, heat } : c)))
-    setDetailClip((d) => (d && d.path === path ? { ...d, heat } : d))
   }
 
   async function toggleClipTag(path, tag, has) {
@@ -214,7 +214,6 @@ export default function LibrariesPage() {
       body: JSON.stringify({ path, tags }),
     })
     setClips((prev) => prev.map((c) => (c.path === path ? { ...c, tags } : c)))
-    setDetailClip((d) => (d && d.path === path ? { ...d, tags } : d))
   }
 
   async function applyBulk() {
@@ -393,9 +392,25 @@ export default function LibrariesPage() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)_250px] gap-4 items-start">
-        <aside className="rounded-lg border border-border bg-card p-3 space-y-1.5">
-          <div className="flex items-center gap-1 px-1 mb-2">
+        <aside className="rounded-lg border border-border bg-card p-3 space-y-1.5 flex flex-col max-h-[min(78vh,900px)] relative">
+          <div className="flex items-center gap-1 px-1 mb-1 shrink-0">
             <p className="text-xs uppercase tracking-wide text-muted-foreground flex-1">Folders</p>
+            <button
+              type="button"
+              title="Folder filters"
+              onClick={() => {
+                playClick()
+                setFolderFilterOpen((v) => !v)
+              }}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                folderFilterOpen || folderQuery || folderEthnicity || folderCountry || folderMinRating !== ''
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+              )}
+            >
+              <Filter size={14} />
+            </button>
             <button
               type="button"
               title={folderSort === 'az' ? 'Sort Z–A' : 'Sort A–Z'}
@@ -426,20 +441,25 @@ export default function LibrariesPage() {
               <Trash2 size={14} />
             </button>
           </div>
-          <div className="space-y-1.5 px-0.5 mb-2">
-            <input
-              type="search"
-              value={folderQuery}
-              onChange={(e) => setFolderQuery(e.target.value)}
-              placeholder="Search folders…"
-              className="w-full px-2 py-1.5 rounded-md bg-secondary border border-border text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <div className="grid grid-cols-1 gap-1">
+          {folderFilterOpen && (
+            <div className="absolute left-2 right-2 top-10 z-20 rounded-lg border border-border bg-card p-3 shadow-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Folder filters</p>
+                <button type="button" className="p-1 rounded hover:bg-secondary" onClick={() => setFolderFilterOpen(false)}>
+                  <X size={12} />
+                </button>
+              </div>
+              <input
+                type="search"
+                value={folderQuery}
+                onChange={(e) => setFolderQuery(e.target.value)}
+                placeholder="Search folders…"
+                className="w-full px-2 py-1.5 rounded-md bg-secondary border border-border text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              />
               <select
                 value={folderEthnicity}
                 onChange={(e) => setFolderEthnicity(e.target.value)}
                 className="w-full px-2 py-1 rounded-md bg-secondary border border-border text-[11px]"
-                title="Filter by ethnicity"
               >
                 <option value="">All ethnicities</option>
                 {ethnicityOptions.map((e) => (
@@ -450,7 +470,6 @@ export default function LibrariesPage() {
                 value={folderCountry}
                 onChange={(e) => setFolderCountry(e.target.value)}
                 className="w-full px-2 py-1 rounded-md bg-secondary border border-border text-[11px]"
-                title="Filter by country / birthplace"
               >
                 <option value="">All countries</option>
                 {countryOptions.map((e) => (
@@ -461,29 +480,29 @@ export default function LibrariesPage() {
                 value={folderMinRating}
                 onChange={(e) => setFolderMinRating(e.target.value)}
                 className="w-full px-2 py-1 rounded-md bg-secondary border border-border text-[11px]"
-                title="Minimum TPDB rating"
               >
                 <option value="">Any rating</option>
                 {[9, 8, 7, 6, 5].map((r) => (
                   <option key={r} value={r}>{r}+ rating</option>
                 ))}
               </select>
+              {(folderQuery || folderEthnicity || folderCountry || folderMinRating !== '') && (
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                  onClick={() => {
+                    setFolderQuery('')
+                    setFolderEthnicity('')
+                    setFolderCountry('')
+                    setFolderMinRating('')
+                  }}
+                >
+                  Clear folder filters
+                </button>
+              )}
             </div>
-            {(folderQuery || folderEthnicity || folderCountry || folderMinRating !== '') && (
-              <button
-                type="button"
-                className="text-[10px] text-muted-foreground hover:text-foreground underline"
-                onClick={() => {
-                  setFolderQuery('')
-                  setFolderEthnicity('')
-                  setFolderCountry('')
-                  setFolderMinRating('')
-                }}
-              >
-                Clear folder filters
-              </button>
-            )}
-          </div>
+          )}
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-1 pr-0.5">
           {libraries.length === 0 && (
             <p className="text-sm text-muted-foreground px-1 py-3">No libraries yet. Hit Add folder.</p>
           )}
@@ -515,6 +534,7 @@ export default function LibrariesPage() {
               </div>
             </button>
           ))}
+          </div>
         </aside>
 
         <section className="min-w-0 space-y-3">
@@ -525,22 +545,6 @@ export default function LibrariesPage() {
           ) : (
             <>
               <div className="flex flex-wrap items-center gap-2 relative">
-                <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
-                  <button
-                    type="button"
-                    onClick={() => { playClick(); setViewMode('grid'); setDetailClip(null) }}
-                    className={viewMode === 'grid' ? 'px-2.5 py-1.5 bg-primary text-primary-foreground' : 'px-2.5 py-1.5 bg-secondary hover:bg-accent'}
-                  >
-                    Grid
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { playClick(); setViewMode('split') }}
-                    className={viewMode === 'split' ? 'px-2.5 py-1.5 bg-primary text-primary-foreground' : 'px-2.5 py-1.5 bg-secondary hover:bg-accent'}
-                  >
-                    Split
-                  </button>
-                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -696,143 +700,18 @@ export default function LibrariesPage() {
                 </div>
               )}
 
-              {viewMode === 'grid' ? (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[min(68vh,820px)] overflow-y-auto pr-1">
-                    {visibleClips.map((clip) => (
-                      <ClipCard
-                        key={clip.path}
-                        clip={clip}
-                        selected={selected.has(clip.path)}
-                        onToggleSelect={toggleSelect}
-                        onPlay={setPreviewPath}
-                        onEdit={setMatchClip}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 items-start">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[min(68vh,820px)] overflow-y-auto pr-1 min-w-0">
-                    {visibleClips.map((clip) => (
-                      <ClipCard
-                        key={clip.path}
-                        clip={clip}
-                        selected={selected.has(clip.path)}
-                        onToggleSelect={toggleSelect}
-                        onPlay={setPreviewPath}
-                        onEdit={setMatchClip}
-                        onSelectDetail={setDetailClip}
-                        detailActive={detailClip?.path === clip.path}
-                      />
-                    ))}
-                  </div>
-                  <aside className="rounded-lg border border-border bg-card p-3 space-y-3 sticky top-2 max-h-[min(68vh,820px)] overflow-y-auto">
-                    {!detailClip ? (
-                      <p className="text-sm text-muted-foreground py-8 text-center">
-                        Click a cover to see details
-                      </p>
-                    ) : (
-                      <>
-                        <img
-                          src={thumbUrl(detailClip.path)}
-                          alt=""
-                          className="w-full aspect-[2/3] object-cover rounded-md bg-secondary"
-                        />
-                        <p className="text-sm font-medium leading-snug break-words" title={detailClip.path}>
-                          {detailClip.name || detailClip.path.split(/[/\\]/).pop()}
-                        </p>
-                        {detailClip.scene?.title && (
-                          <p className="text-xs text-muted-foreground">
-                            {[detailClip.scene.studio, detailClip.scene.date, detailClip.scene.title]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </p>
-                        )}
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Heat</p>
-                          <div className="flex gap-1">
-                            {[1, 2, 3, 4, 5].map((h) => (
-                              <button
-                                key={h}
-                                type="button"
-                                onClick={() => setClipHeat(detailClip.path, h)}
-                                className="p-1 rounded hover:bg-secondary"
-                              >
-                                <Flame
-                                  size={18}
-                                  className={
-                                    (detailClip.heat || 3) >= h
-                                      ? 'text-orange-500 fill-orange-500'
-                                      : 'text-muted-foreground'
-                                  }
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">Tags</p>
-                          <div className="flex flex-wrap gap-1">
-                            {vocab.map((tag) => {
-                              const has = (detailClip.tags || []).includes(tag)
-                              return (
-                                <button
-                                  key={tag}
-                                  type="button"
-                                  onClick={() => toggleClipTag(detailClip.path, tag, has)}
-                                  className={
-                                    has
-                                      ? 'px-1.5 py-0 rounded text-[10px] leading-5 bg-primary text-primary-foreground'
-                                      : 'px-1.5 py-0 rounded text-[10px] leading-5 bg-secondary/70 text-muted-foreground hover:text-foreground'
-                                  }
-                                >
-                                  {tag}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <button
-                            type="button"
-                            className="px-2.5 py-1 rounded-md text-xs bg-secondary hover:bg-accent"
-                            onClick={() => {
-                              playClick()
-                              setPreviewPath(detailClip.path)
-                            }}
-                          >
-                            Play
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2.5 py-1 rounded-md text-xs bg-secondary hover:bg-accent"
-                            onClick={() => {
-                              playClick()
-                              setMatchClip(detailClip)
-                            }}
-                          >
-                            Edit scene
-                          </button>
-                          <button
-                            type="button"
-                            className="px-2.5 py-1 rounded-md text-xs bg-secondary hover:bg-accent font-mono"
-                            onClick={() => {
-                              playClick()
-                              setRenameClip(detailClip)
-                              setRenameValue(
-                                detailClip.name || detailClip.path.split(/[/\\]/).pop() || '',
-                              )
-                            }}
-                          >
-                            Rename
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </aside>
-                </div>
-              )}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[min(68vh,820px)] overflow-y-auto pr-1">
+                {visibleClips.map((clip) => (
+                  <ClipCard
+                    key={clip.path}
+                    clip={clip}
+                    selected={selected.has(clip.path)}
+                    onToggleSelect={toggleSelect}
+                    onPlay={setPreviewPath}
+                    onEdit={setEditClip}
+                  />
+                ))}
+              </div>
               {!loading && visibleClips.length === 0 && (
                 <p className="p-8 text-sm text-muted-foreground text-center rounded-lg border border-dashed border-border">
                   No clips match filters. Clear filters or rescan.
@@ -903,6 +782,21 @@ export default function LibrariesPage() {
           src={mediaUrl(previewPath)}
           title={previewPath.split(/[/\\]/).pop()}
           onClose={() => setPreviewPath(null)}
+        />
+      )}
+      {editClip && (
+        <ClipEditModal
+          libraryId={activeId}
+          clip={editClip}
+          onClose={() => setEditClip(null)}
+          onSaved={async () => {
+            setEditClip(null)
+            await loadClips()
+          }}
+          onMatch={(c) => {
+            setEditClip(null)
+            setMatchClip(c)
+          }}
         />
       )}
       {matchClip && (

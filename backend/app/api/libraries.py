@@ -312,6 +312,19 @@ async def scene_search(lib_id: str, req: SceneSearchRequest):
         raise HTTPException(400, str(e))
 
 
+@router.patch("/{lib_id}/clip/scene")
+async def patch_clip_scene(lib_id: str, body: dict):
+    from ..services import scene_apply as sa
+    path = body.get("path") or ""
+    scene = body.get("scene") or body
+    try:
+        return sa.update_clip_scene(lib_id, path, scene)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 @router.post("/{lib_id}/clip/rename")
 async def clip_rename(lib_id: str, body: dict):
     from ..services import scene_apply as sa

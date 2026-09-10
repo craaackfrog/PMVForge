@@ -7,7 +7,9 @@ function thumbUrl(path) {
 }
 
 /**
- * Gallery-first clip tile (mockup: cover → hover blur + play + edit, matched ribbon).
+ * Gallery-first clip tile:
+ * cover (API poster when matched, else video thumb) → hover blur + Play + Edit
+ * title + date under cover (Instrument Serif for title)
  */
 export default function ClipCard({
   clip,
@@ -15,33 +17,33 @@ export default function ClipCard({
   onToggleSelect,
   onPlay,
   onEdit,
-  onSelectDetail,
-  detailActive,
   className,
 }) {
-  const matched = !!(clip?.scene?.tpdb_id || clip?.scene?.title)
-  const name = clip.name || (clip.path || '').split(/[/\\]/).pop()
+  const scene = clip?.scene || {}
+  const matched = !!(scene.tpdb_id || scene.title)
+  const poster = (scene.poster || '').trim()
+  const coverSrc = poster || thumbUrl(clip.path)
+  const title = scene.title || clip.name || (clip.path || '').split(/[/\\]/).pop()
+  const date = scene.date || ''
 
   return (
-    <div
-      className={cn(
-        'group relative flex flex-col min-w-0',
-        detailActive && 'ring-2 ring-primary rounded-lg',
-        className,
-      )}
-    >
+    <div className={cn('group relative flex flex-col min-w-0', className)}>
       <div className="relative aspect-[2/3] rounded-lg overflow-hidden border border-border bg-secondary/40">
         <img
-          src={thumbUrl(clip.path)}
+          src={coverSrc}
           alt=""
           className="absolute inset-0 w-full h-full object-cover transition duration-200 group-hover:scale-[1.02] group-hover:blur-[2px] group-hover:brightness-50"
           loading="lazy"
           onError={(e) => {
-            e.currentTarget.style.opacity = '0'
+            if (poster && !e.currentTarget.dataset.fell) {
+              e.currentTarget.dataset.fell = '1'
+              e.currentTarget.src = thumbUrl(clip.path)
+            } else {
+              e.currentTarget.style.opacity = '0'
+            }
           }}
         />
 
-        {/* matched ribbon */}
         {matched && (
           <span
             title="Matched on ThePornDB"
@@ -51,7 +53,6 @@ export default function ClipCard({
           </span>
         )}
 
-        {/* select checkbox — always available, subtle */}
         <button
           type="button"
           onClick={(e) => {
@@ -69,7 +70,6 @@ export default function ClipCard({
           {selected && <Check size={12} strokeWidth={3} />}
         </button>
 
-        {/* hover overlay: play + edit */}
         <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             type="button"
@@ -85,7 +85,7 @@ export default function ClipCard({
           </button>
           <button
             type="button"
-            title="Match / edit scene"
+            title="Edit metadata"
             onClick={(e) => {
               e.stopPropagation()
               playClick()
@@ -94,24 +94,25 @@ export default function ClipCard({
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/70 text-white text-xs border border-white/20 hover:bg-black"
           >
             <Pencil size={12} />
-            edit
+            Edit
           </button>
         </div>
-
-        {/* click card body → detail (split mode) */}
-        {onSelectDetail && (
-          <button
-            type="button"
-            className="absolute inset-0 z-[1]"
-            aria-label="Open details"
-            onClick={() => onSelectDetail(clip)}
-          />
-        )}
       </div>
 
-      <p className="mt-1.5 text-xs leading-snug line-clamp-2 text-muted-foreground group-hover:text-foreground px-0.5" title={name}>
-        {name}
-      </p>
+      <div className="mt-1.5 px-0.5 space-y-0.5 min-w-0">
+        <p className="font-serif text-sm leading-snug line-clamp-2 text-foreground" title={title}>
+          {title}
+        </p>
+        {date ? (
+          <p className="text-[11px] text-muted-foreground tabular-nums">{date}</p>
+        ) : (
+          !matched && (
+            <p className="text-[11px] text-muted-foreground/70 truncate" title={clip.name}>
+              {clip.name || ''}
+            </p>
+          )
+        )}
+      </div>
     </div>
   )
 }

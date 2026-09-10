@@ -188,6 +188,7 @@ def apply_scene_match(
         "date": scene.get("date"),
         "studio": scene.get("studio"),
         "url": scene.get("url"),
+        "poster": scene.get("poster") or scene.get("image") or "",
         "performers": female_names,
         "tags": list(scene.get("tags") or []),
     }
@@ -304,3 +305,44 @@ def rename_clip_only(lib_id: str, path: str, filename: str) -> Dict[str, Any]:
     lib.clips[clip["path"]] = clip
     store.save_library(lib)
     return {"clip": clip, "path": clip["path"]}
+
+
+def update_clip_scene(lib_id: str, path: str, scene_patch: dict) -> dict:
+    """Patch stored scene metadata for a clip (manual edit after match)."""
+    lib = store.load_library(lib_id)
+    if not lib:
+        raise ValueError("Library not found")
+    key = path
+    if key not in lib.clips:
+        try:
+            key = str(Path(path).resolve())
+        except Exception:
+            pass
+    if key not in lib.clips:
+        raise ValueError("Clip not in library")
+    clip = dict(lib.clips[key])
+    scene = dict(clip.get("scene") or {})
+    for k in ("title", "date", "studio", "url", "poster", "kind", "tpdb_id"):
+        if k in scene_patch and scene_patch[k] is not None:
+            scene[k] = scene_patch[k]
+    if "performers" in scene_patch:
+        perf = scene_patch["performers"]
+        if isinstance(perf, str):
+            perf = [x.strip() for x in perf.split(",") if x.strip()]
+        scene["performers"] = list(perf or [])
+    if "tags" in scene_patch:
+        tags = scene_patch["tags"]
+        if isinstance(tags, str):
+            tags = [x.strip().lower() for x in tags.split(",") if x.strip()]
+        scene["tags"] = list(tags or [])
+        # also merge into clip tags
+        clip_tags = set(clip.get("tags") or [])
+        for tg in scene["tags"]:
+            clip_tags.add(tg)
+            if tg not in lib.tags_vocab:
+                lib.tags_vocab.append(tg)
+        clip["tags"] = sorted(clip_tags)
+    clip["scene"] = scene
+    lib.clips[key] = clip
+    store.save_library(lib)
+    return {"clip": clip}
