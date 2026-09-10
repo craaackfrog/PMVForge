@@ -9,18 +9,18 @@ import {
   Flame,
   CheckSquare,
   Square,
-  Play,
   X,
   Plus,
   HelpCircle,
-  Pencil,
   ArrowDownAZ,
   ArrowUpAZ,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { playClick, playTap, playDone, playError } from '../lib/sounds'
 import VideoModal from '../components/VideoModal'
 import SceneMatchModal from '../components/SceneMatchModal'
 import PerformerCard from '../components/PerformerCard'
+import ClipCard from '../components/ClipCard'
 import { nativePick } from '../lib/nativePick'
 import { cn } from '../lib/utils'
 
@@ -54,6 +54,10 @@ export default function LibrariesPage() {
   const [renameValue, setRenameValue] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [folderSort, setFolderSort] = useState('az') // az | za
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [unmatchedOnly, setUnmatchedOnly] = useState(false)
+  const [viewMode, setViewMode] = useState('grid') // grid | split
+  const [detailClip, setDetailClip] = useState(null)
   const [folderQuery, setFolderQuery] = useState('')
   const [folderEthnicity, setFolderEthnicity] = useState('')
   const [folderCountry, setFolderCountry] = useState('')
@@ -102,6 +106,7 @@ export default function LibrariesPage() {
 
   useEffect(() => {
     loadClips()
+    setDetailClip(null)
   }, [loadClips])
 
   async function addLibrary() {
@@ -193,6 +198,7 @@ export default function LibrariesPage() {
       body: JSON.stringify({ path, heat }),
     })
     setClips((prev) => prev.map((c) => (c.path === path ? { ...c, heat } : c)))
+    setDetailClip((d) => (d && d.path === path ? { ...d, heat } : d))
   }
 
   async function toggleClipTag(path, tag, has) {
@@ -208,6 +214,7 @@ export default function LibrariesPage() {
       body: JSON.stringify({ path, tags }),
     })
     setClips((prev) => prev.map((c) => (c.path === path ? { ...c, tags } : c)))
+    setDetailClip((d) => (d && d.path === path ? { ...d, tags } : d))
   }
 
   async function applyBulk() {
@@ -279,6 +286,10 @@ export default function LibrariesPage() {
 
   // Single sorted vocabulary for the whole UI (global tags store)
   const vocab = [...allTags].sort((a, b) => a.localeCompare(b))
+  const visibleClips = unmatchedOnly
+    ? clips.filter((c) => !(c.scene?.tpdb_id || c.scene?.title))
+    : clips
+
   const ethnicityOptions = [...new Set(
     libraries.map((l) => (l.performer?.ethnicity || '').trim()).filter(Boolean)
   )].sort((a, b) => a.localeCompare(b))
@@ -381,7 +392,7 @@ export default function LibrariesPage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-[200px_minmax(0,1fr)_220px] gap-4 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[250px_minmax(0,1fr)_250px] gap-4 items-start">
         <aside className="rounded-lg border border-border bg-card p-3 space-y-1.5">
           <div className="flex items-center gap-1 px-1 mb-2">
             <p className="text-xs uppercase tracking-wide text-muted-foreground flex-1">Folders</p>
@@ -513,64 +524,140 @@ export default function LibrariesPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-lg border border-border bg-card p-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Tag size={14} className="text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Filter</span>
-                  {['any', 'all'].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => {
-                        playClick()
-                        setTagMode(m)
-                      }}
-                      className={
-                        tagMode === m
-                          ? 'px-2 py-0.5 rounded text-xs bg-primary text-primary-foreground'
-                          : 'px-2 py-0.5 rounded text-xs bg-secondary hover:bg-accent'
-                      }
-                    >
-                      {m}
-                    </button>
-                  ))}
-                  <span className="w-px h-4 bg-border mx-1" />
-                  <Flame size={14} className="text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">Min heat</span>
-                  {[1, 2, 3, 4, 5].map((h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => {
-                        playClick()
-                        setMinHeat(h)
-                      }}
-                      className={
-                        minHeat === h
-                          ? 'w-6 h-6 rounded text-[11px] font-medium bg-orange-500 text-white'
-                          : 'w-6 h-6 rounded text-[11px] font-medium bg-secondary hover:bg-accent'
-                      }
-                    >
-                      {h}
-                    </button>
-                  ))}
+              <div className="flex flex-wrap items-center gap-2 relative">
+                <div className="inline-flex rounded-md border border-border overflow-hidden text-xs">
+                  <button
+                    type="button"
+                    onClick={() => { playClick(); setViewMode('grid'); setDetailClip(null) }}
+                    className={viewMode === 'grid' ? 'px-2.5 py-1.5 bg-primary text-primary-foreground' : 'px-2.5 py-1.5 bg-secondary hover:bg-accent'}
+                  >
+                    Grid
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { playClick(); setViewMode('split') }}
+                    className={viewMode === 'split' ? 'px-2.5 py-1.5 bg-primary text-primary-foreground' : 'px-2.5 py-1.5 bg-secondary hover:bg-accent'}
+                  >
+                    Split
+                  </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {vocab.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleFilterTag(tag)}
-                      className={
-                        filterTags.includes(tag)
-                          ? 'px-2 py-0.5 rounded-full text-xs bg-primary text-primary-foreground'
-                          : 'px-2 py-0.5 rounded-full text-xs bg-secondary hover:bg-accent'
-                      }
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playClick()
+                    setFilterOpen((v) => !v)
+                  }}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border',
+                    filterOpen || filterTags.length || minHeat > 1 || unmatchedOnly
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-secondary hover:bg-accent',
+                  )}
+                >
+                  <SlidersHorizontal size={14} />
+                  Filters
+                  {(filterTags.length > 0 || minHeat > 1 || unmatchedOnly) && (
+                    <span className="text-[10px] opacity-80">
+                      ({filterTags.length + (minHeat > 1 ? 1 : 0) + (unmatchedOnly ? 1 : 0)})
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {selected.size === visibleClips.length && visibleClips.length > 0 ? (
+                    <CheckSquare size={14} />
+                  ) : (
+                    <Square size={14} />
+                  )}
+                  Select all
+                </button>
+                <span className="text-xs text-muted-foreground ml-auto">
+                  {loading ? 'Loading…' : `${visibleClips.length} clips`}
+                </span>
+
+                {filterOpen && (
+                  <div className="absolute left-0 top-full mt-2 z-20 w-full max-w-md rounded-lg border border-border bg-card p-3 shadow-xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Clip filters</p>
+                      <button type="button" className="p-1 rounded hover:bg-secondary" onClick={() => setFilterOpen(false)}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Tag mode</span>
+                      {['any', 'all'].map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => {
+                            playClick()
+                            setTagMode(m)
+                          }}
+                          className={
+                            tagMode === m
+                              ? 'px-2 py-0.5 rounded text-xs bg-primary text-primary-foreground'
+                              : 'px-2 py-0.5 rounded text-xs bg-secondary hover:bg-accent'
+                          }
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1.5">Tags</p>
+                      <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                        {vocab.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => toggleFilterTag(tag)}
+                            className={
+                              filterTags.includes(tag)
+                                ? 'px-2 py-0.5 rounded-full text-xs bg-primary text-primary-foreground'
+                                : 'px-2 py-0.5 rounded-full text-xs bg-secondary hover:bg-accent'
+                            }
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground mr-1">Min heat</span>
+                      {[1, 2, 3, 4, 5].map((h) => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => {
+                            playClick()
+                            setMinHeat(h)
+                          }}
+                          className="p-1 rounded hover:bg-secondary"
+                          title={`Min heat ${h}`}
+                        >
+                          <Flame
+                            size={16}
+                            className={minHeat >= h ? 'text-orange-500 fill-orange-500' : 'text-muted-foreground'}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={unmatchedOnly}
+                        onChange={(e) => {
+                          playClick()
+                          setUnmatchedOnly(e.target.checked)
+                        }}
+                      />
+                      Unmatched only (no ThePornDB scene)
+                    </label>
+                  </div>
+                )}
               </div>
 
               {selected.size > 0 && (
@@ -584,17 +671,21 @@ export default function LibrariesPage() {
                     placeholder="Add tag to selected…"
                     className="px-2 py-1 rounded-md bg-secondary border border-border text-sm w-40"
                   />
-                  <select
-                    value={bulkHeat}
-                    onChange={(e) => setBulkHeat(parseInt(e.target.value, 10))}
-                    className="px-2 py-1 rounded-md bg-secondary border border-border text-sm"
-                  >
+                  <div className="flex items-center gap-0.5" title="Set heat">
                     {[1, 2, 3, 4, 5].map((h) => (
-                      <option key={h} value={h}>
-                        Heat {h}
-                      </option>
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setBulkHeat(h)}
+                        className="p-0.5 rounded hover:bg-secondary"
+                      >
+                        <Flame
+                          size={16}
+                          className={bulkHeat >= h ? 'text-orange-500 fill-orange-500' : 'text-muted-foreground'}
+                        />
+                      </button>
                     ))}
-                  </select>
+                  </div>
                   <button
                     type="button"
                     onClick={applyBulk}
@@ -605,99 +696,95 @@ export default function LibrariesPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <button
-                  type="button"
-                  onClick={selectAll}
-                  className="inline-flex items-center gap-1.5 hover:text-foreground"
-                >
-                  {selected.size === clips.length && clips.length > 0 ? (
-                    <CheckSquare size={14} />
-                  ) : (
-                    <Square size={14} />
-                  )}
-                  Select all visible
-                </button>
-                <span>{loading ? 'Loading…' : `${clips.length} clips`}</span>
-              </div>
-
-              <div className="rounded-lg border border-border bg-card overflow-hidden">
-                <div className="max-h-[min(62vh,720px)] overflow-y-auto divide-y divide-border">
-                  {clips.map((clip) => {
-                    const isSel = selected.has(clip.path)
-                    const applied = new Set(clip.tags || [])
-                    return (
-                      <div
+              {viewMode === 'grid' ? (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 max-h-[min(68vh,820px)] overflow-y-auto pr-1">
+                    {visibleClips.map((clip) => (
+                      <ClipCard
                         key={clip.path}
-                        className={
-                          isSel
-                            ? 'flex gap-3 px-3 py-2.5 items-center bg-accent/50'
-                            : 'flex gap-3 px-3 py-2.5 items-center hover:bg-secondary/30'
-                        }
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleSelect(clip.path)}
-                          className="text-muted-foreground shrink-0"
-                        >
-                          {isSel ? <CheckSquare size={16} /> : <Square size={16} />}
-                        </button>
-
-                        <button
-                          type="button"
-                          title="Preview"
-                          onClick={() => {
-                            playClick()
-                            setPreviewPath(clip.path)
-                          }}
-                          className="shrink-0 p-1.5 rounded-md bg-secondary hover:bg-accent"
-                        >
-                          <Play size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Match scene (ThePornDB)"
-                          onClick={() => {
-                            playClick()
-                            setMatchClip(clip)
-                          }}
-                          className="shrink-0 p-1.5 rounded-md bg-secondary hover:bg-accent"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          title="Rename file"
-                          onClick={() => {
-                            playClick()
-                            setRenameClip(clip)
-                            setRenameValue(clip.name || clip.path.split(/[/\\]/).pop() || '')
-                          }}
-                          className="shrink-0 px-1.5 py-1 rounded-md bg-secondary hover:bg-accent text-[10px] font-mono text-muted-foreground"
-                        >
-                          Aa
-                        </button>
-
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="text-sm font-medium truncate" title={clip.path}>
-                            <span className="inline-flex items-center gap-2 min-w-0">
-                              <img src={thumbUrl(clip.path)} alt="" className="w-14 h-10 rounded object-cover bg-secondary shrink-0" loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                              <span className="truncate">{clip.name || clip.path.split(/[/\\]/).pop()}</span>
-                            </span>
+                        clip={clip}
+                        selected={selected.has(clip.path)}
+                        onToggleSelect={toggleSelect}
+                        onPlay={setPreviewPath}
+                        onEdit={setMatchClip}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-3 items-start">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-[min(68vh,820px)] overflow-y-auto pr-1 min-w-0">
+                    {visibleClips.map((clip) => (
+                      <ClipCard
+                        key={clip.path}
+                        clip={clip}
+                        selected={selected.has(clip.path)}
+                        onToggleSelect={toggleSelect}
+                        onPlay={setPreviewPath}
+                        onEdit={setMatchClip}
+                        onSelectDetail={setDetailClip}
+                        detailActive={detailClip?.path === clip.path}
+                      />
+                    ))}
+                  </div>
+                  <aside className="rounded-lg border border-border bg-card p-3 space-y-3 sticky top-2 max-h-[min(68vh,820px)] overflow-y-auto">
+                    {!detailClip ? (
+                      <p className="text-sm text-muted-foreground py-8 text-center">
+                        Click a cover to see details
+                      </p>
+                    ) : (
+                      <>
+                        <img
+                          src={thumbUrl(detailClip.path)}
+                          alt=""
+                          className="w-full aspect-[2/3] object-cover rounded-md bg-secondary"
+                        />
+                        <p className="text-sm font-medium leading-snug break-words" title={detailClip.path}>
+                          {detailClip.name || detailClip.path.split(/[/\\]/).pop()}
+                        </p>
+                        {detailClip.scene?.title && (
+                          <p className="text-xs text-muted-foreground">
+                            {[detailClip.scene.studio, detailClip.scene.date, detailClip.scene.title]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        )}
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Heat</p>
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map((h) => (
+                              <button
+                                key={h}
+                                type="button"
+                                onClick={() => setClipHeat(detailClip.path, h)}
+                                className="p-1 rounded hover:bg-secondary"
+                              >
+                                <Flame
+                                  size={18}
+                                  className={
+                                    (detailClip.heat || 3) >= h
+                                      ? 'text-orange-500 fill-orange-500'
+                                      : 'text-muted-foreground'
+                                  }
+                                />
+                              </button>
+                            ))}
                           </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5">Tags</p>
                           <div className="flex flex-wrap gap-1">
                             {vocab.map((tag) => {
-                              const has = applied.has(tag)
+                              const has = (detailClip.tags || []).includes(tag)
                               return (
                                 <button
                                   key={tag}
                                   type="button"
-                                  title={has ? `Remove "${tag}"` : `Add "${tag}"`}
-                                  onClick={() => toggleClipTag(clip.path, tag, has)}
+                                  onClick={() => toggleClipTag(detailClip.path, tag, has)}
                                   className={
                                     has
                                       ? 'px-1.5 py-0 rounded text-[10px] leading-5 bg-primary text-primary-foreground'
-                                      : 'px-1.5 py-0 rounded text-[10px] leading-5 bg-secondary/70 text-muted-foreground hover:text-foreground hover:bg-secondary'
+                                      : 'px-1.5 py-0 rounded text-[10px] leading-5 bg-secondary/70 text-muted-foreground hover:text-foreground'
                                   }
                                 >
                                   {tag}
@@ -706,33 +793,52 @@ export default function LibrariesPage() {
                             })}
                           </div>
                         </div>
-
-                        <div className="flex gap-0.5 shrink-0" title="Heat ranking">
-                          {[1, 2, 3, 4, 5].map((h) => (
-                            <button
-                              key={h}
-                              type="button"
-                              onClick={() => setClipHeat(clip.path, h)}
-                              className={
-                                (clip.heat || 3) >= h
-                                  ? 'w-6 h-6 rounded text-[10px] font-medium bg-orange-500/90 text-white'
-                                  : 'w-6 h-6 rounded text-[10px] font-medium bg-secondary text-muted-foreground hover:bg-accent'
-                              }
-                            >
-                              {h}
-                            </button>
-                          ))}
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button
+                            type="button"
+                            className="px-2.5 py-1 rounded-md text-xs bg-secondary hover:bg-accent"
+                            onClick={() => {
+                              playClick()
+                              setPreviewPath(detailClip.path)
+                            }}
+                          >
+                            Play
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2.5 py-1 rounded-md text-xs bg-secondary hover:bg-accent"
+                            onClick={() => {
+                              playClick()
+                              setMatchClip(detailClip)
+                            }}
+                          >
+                            Edit scene
+                          </button>
+                          <button
+                            type="button"
+                            className="px-2.5 py-1 rounded-md text-xs bg-secondary hover:bg-accent font-mono"
+                            onClick={() => {
+                              playClick()
+                              setRenameClip(detailClip)
+                              setRenameValue(
+                                detailClip.name || detailClip.path.split(/[/\\]/).pop() || '',
+                              )
+                            }}
+                          >
+                            Rename
+                          </button>
                         </div>
-                      </div>
-                    )
-                  })}
-                  {!loading && clips.length === 0 && (
-                    <p className="p-8 text-sm text-muted-foreground text-center">
-                      No clips match filters. Clear filters or rescan.
-                    </p>
-                  )}
+                      </>
+                    )}
+                  </aside>
                 </div>
-              </div>
+              )}
+              {!loading && visibleClips.length === 0 && (
+                <p className="p-8 text-sm text-muted-foreground text-center rounded-lg border border-dashed border-border">
+                  No clips match filters. Clear filters or rescan.
+                </p>
+              )}
+
             </>
           )}
         </section>
