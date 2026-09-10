@@ -197,6 +197,19 @@ async def delete_performer_override(lib_id: str):
         raise HTTPException(500, str(e))
 
 
+@router.post("/{lib_id}/performer/favorite-image")
+async def favorite_performer_image(lib_id: str, body: dict):
+    """Set a gallery image as the primary photo for this library's performer card."""
+    from ..services import performer_profile as pp
+    path = body.get("path") or body.get("image_path") or ""
+    try:
+        return pp.set_favorite_image(lib_id, path)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.post("/{lib_id}/performer/refresh")
 async def refresh_performer_profile(lib_id: str):
     from ..services import performer_profile as pp

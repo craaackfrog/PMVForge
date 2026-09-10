@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Loader2, RefreshCw, User, Star, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Loader2, RefreshCw, User, Star, ChevronLeft, ChevronRight, Heart } from 'lucide-react'
 import { playTap, playError, playClick } from '../lib/sounds'
 import ImageModal from './ImageModal'
 import PerformerEditModal from './PerformerEditModal'
@@ -98,6 +98,31 @@ export default function PerformerCard({ libraryId }) {
   }, [profile])
 
 
+  async function favoriteCurrent() {
+    const paths = profile?.image_paths?.length
+      ? profile.image_paths
+      : profile?.image_path
+        ? [profile.image_path]
+        : []
+    const path = paths[slide % Math.max(paths.length, 1)]
+    if (!path || !libraryId) return
+    playTap()
+    try {
+      const res = await fetch(`/api/libraries/${libraryId}/performer/favorite-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail || res.statusText)
+      setProfile(data)
+      setSlide(0)
+    } catch (e) {
+      playError()
+      setProfile((prev) => ({ ...(prev || {}), error: e.message }))
+    }
+  }
+
   async function refresh() {
     if (!libraryId) return
     playTap()
@@ -168,6 +193,19 @@ export default function PerformerCard({ libraryId }) {
                 className="w-full h-full object-cover object-center"
               />
             </button>
+            {gallery.length > 0 && (
+              <button
+                type="button"
+                title="Set as main photo"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  favoriteCurrent()
+                }}
+                className="absolute top-1.5 right-1.5 z-10 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70 hover:text-pink-400"
+              >
+                <Heart size={14} className={slide === 0 && profile?.favorite_image ? 'fill-pink-400 text-pink-400' : ''} />
+              </button>
+            )}
             {gallery.length > 1 && (
               <>
                 <button

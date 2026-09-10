@@ -165,6 +165,16 @@ def _load_cache(key: str) -> Optional[dict]:
     if z.is_file() and str(z.resolve()) not in paths:
         paths.insert(0, str(z.resolve()))
     if paths:
+        fav = data.get("favorite_image")
+        if fav:
+            try:
+                fav_r = str(Path(fav).resolve())
+            except Exception:
+                fav_r = fav
+            if fav_r in paths:
+                paths = [fav_r] + [x for x in paths if x != fav_r]
+            elif Path(str(fav)).is_file():
+                paths = [str(Path(fav).resolve())] + paths
         data["image_path"] = paths[0]
         data["image_paths"] = paths
     data["cached"] = True
@@ -531,6 +541,72 @@ def clear_local_override(lib_id: str) -> dict:
 def save_local_override(lib_id: str, payload: dict) -> dict:
     """Deprecated name — edits existing JSON in place."""
     return save_performer_edit(lib_id, payload)
+
+
+def set_favorite_image(lib_id: str, image_path: str) -> dict:
+    """Mark one cached gallery image as primary (shown first on card)."""
+    lib = lib_store.load_library(lib_id)
+    if not lib:
+        raise ValueError("Library not found")
+    root = Path(lib.root_path)
+    query_name = lib.name or (root.name if root.exists() else lib_id)
+    key = _slug(query_name)
+    d = _cache_dir(key)
+    profile_path = d / "profile.json"
+    if not profile_path.is_file():
+        raise ValueError("No cached performer profile to update")
+    try:
+        data = json.loads(profile_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ValueError(f"Bad profile.json: {e}") from e
+    if not isinstance(data, dict):
+        raise ValueError("Bad profile.json")
+
+    target = str(Path(image_path).resolve())
+    # Collect existing gallery paths
+    paths = []
+    for i, name in enumerate(["image.jpg"] + [f"image_{i}.jpg" for i in range(1, 16)]):
+        f = d / name
+        if f.is_file():
+            paths.append(str(f.resolve()))
+    # also honor listed image_paths
+    for pth in data.get("image_paths") or []:
+        try:
+            rp = str(Path(pth).resolve())
+        except Exception:
+            rp = pth
+        if rp not in paths and Path(rp).is_file():
+            paths.append(rp)
+
+    if target not in paths and Path(target).is_file() and target.startswith(str(d.resolve())):
+        paths.append(target)
+    if target not in paths:
+        raise ValueError("Image is not part of this performer gallery")
+
+    # Reorder: favorite first
+    ordered = [target] + [x for x in paths if x != target]
+    data["image_paths"] = ordered
+    data["image_path"] = target
+    data["favorite_image"] = target
+    data["user_edited"] = True
+
+    # Make image.jpg a copy of favorite for simple loaders
+    fav = Path(target)
+    primary = d / "image.jpg"
+    if fav.resolve() != primary.resolve():
+        try:
+            primary.write_bytes(fav.read_bytes())
+            data["image_path"] = str(primary.resolve())
+            # keep favorite path as preferred display if different files
+            ordered = [str(primary.resolve())] + [x for x in ordered if Path(x).resolve() != primary.resolve()]
+            data["image_paths"] = ordered
+        except Exception:
+            pass
+
+    profile_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    out = get_profile_for_library(lib_id, force_refresh=False)
+    out["favorite_image"] = data.get("favorite_image")
+    return out
 
 def media_path_allowed(path: str) -> bool:
     """True if path is under performer_cache or a library root cover."""
