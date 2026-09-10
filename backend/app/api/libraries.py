@@ -50,7 +50,17 @@ class RenameRequest(BaseModel):
 
 @router.get("")
 async def list_libraries():
-    return {"libraries": store.list_libraries(), "all_tags": store.all_tags()}
+    from ..services import performer_profile as pp
+    libs = store.list_libraries()
+    enriched = []
+    for e in libs:
+        row = dict(e)
+        try:
+            row["performer"] = pp.summary_for_library(lib_id=e.get("id"), name=e.get("name"))
+        except Exception:
+            row["performer"] = {}
+        enriched.append(row)
+    return {"libraries": enriched, "all_tags": store.all_tags()}
 
 
 @router.post("")

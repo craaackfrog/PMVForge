@@ -608,6 +608,32 @@ def set_favorite_image(lib_id: str, image_path: str) -> dict:
     out["favorite_image"] = data.get("favorite_image")
     return out
 
+
+def summary_for_library(lib_id: str = None, name: str = None) -> dict:
+    """Lightweight performer fields for library list filtering (from cache/override only)."""
+    lib = lib_store.load_library(lib_id) if lib_id else None
+    label = (lib.name if lib else None) or name or ""
+    if not label and lib:
+        label = Path(lib.root_path).name
+    key = _slug(label)
+    cached = _load_cache(key)
+    if not cached and lib:
+        local = _read_local_override(Path(lib.root_path))
+        if local:
+            cached = local
+    if not cached:
+        return {}
+    extras = cached.get("extras") or {}
+    return {
+        "ethnicity": extras.get("ethnicity") or "",
+        "birthplace": extras.get("birthplace") or "",
+        "flag_country": extras.get("flag_country") or extras.get("flag") or "",
+        "country": extras.get("country") or extras.get("flag_country") or "",
+        "rating": cached.get("rating"),
+        "age": cached.get("age"),
+        "name": cached.get("name") or label,
+    }
+
 def media_path_allowed(path: str) -> bool:
     """True if path is under performer_cache or a library root cover."""
     try:

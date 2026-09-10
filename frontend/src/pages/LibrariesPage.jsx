@@ -54,6 +54,10 @@ export default function LibrariesPage() {
   const [renameValue, setRenameValue] = useState('')
   const [showHelp, setShowHelp] = useState(false)
   const [folderSort, setFolderSort] = useState('az') // az | za
+  const [folderQuery, setFolderQuery] = useState('')
+  const [folderEthnicity, setFolderEthnicity] = useState('')
+  const [folderCountry, setFolderCountry] = useState('')
+  const [folderMinRating, setFolderMinRating] = useState('')
 
   const active = libraries.find((l) => l.id === activeId)
 
@@ -275,10 +279,40 @@ export default function LibrariesPage() {
 
   // Single sorted vocabulary for the whole UI (global tags store)
   const vocab = [...allTags].sort((a, b) => a.localeCompare(b))
-  const sortedLibraries = [...libraries].sort((a, b) => {
-    const cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
-    return folderSort === 'za' ? -cmp : cmp
-  })
+  const ethnicityOptions = [...new Set(
+    libraries.map((l) => (l.performer?.ethnicity || '').trim()).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b))
+  const countryOptions = [...new Set(
+    libraries.map((l) => {
+      const p = l.performer || {}
+      return (p.flag_country || p.country || p.birthplace || '').trim()
+    }).filter(Boolean)
+  )].sort((a, b) => a.localeCompare(b))
+
+  const sortedLibraries = [...libraries]
+    .filter((lib) => {
+      const q = folderQuery.trim().toLowerCase()
+      if (q) {
+        const name = (lib.name || '').toLowerCase()
+        const pname = (lib.performer?.name || '').toLowerCase()
+        if (!name.includes(q) && !pname.includes(q)) return false
+      }
+      const perf = lib.performer || {}
+      if (folderEthnicity && (perf.ethnicity || '') !== folderEthnicity) return false
+      if (folderCountry) {
+        const c = `${perf.flag_country || ''} ${perf.country || ''} ${perf.birthplace || ''}`.toLowerCase()
+        if (!c.includes(folderCountry.toLowerCase())) return false
+      }
+      if (folderMinRating !== '' && folderMinRating != null) {
+        const r = Number(perf.rating)
+        if (Number.isNaN(r) || r < Number(folderMinRating)) return false
+      }
+      return true
+    })
+    .sort((a, b) => {
+      const cmp = (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+      return folderSort === 'za' ? -cmp : cmp
+    })
 
 
   return (
@@ -381,8 +415,69 @@ export default function LibrariesPage() {
               <Trash2 size={14} />
             </button>
           </div>
+          <div className="space-y-1.5 px-0.5 mb-2">
+            <input
+              type="search"
+              value={folderQuery}
+              onChange={(e) => setFolderQuery(e.target.value)}
+              placeholder="Search folders…"
+              className="w-full px-2 py-1.5 rounded-md bg-secondary border border-border text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+            <div className="grid grid-cols-1 gap-1">
+              <select
+                value={folderEthnicity}
+                onChange={(e) => setFolderEthnicity(e.target.value)}
+                className="w-full px-2 py-1 rounded-md bg-secondary border border-border text-[11px]"
+                title="Filter by ethnicity"
+              >
+                <option value="">All ethnicities</option>
+                {ethnicityOptions.map((e) => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
+              <select
+                value={folderCountry}
+                onChange={(e) => setFolderCountry(e.target.value)}
+                className="w-full px-2 py-1 rounded-md bg-secondary border border-border text-[11px]"
+                title="Filter by country / birthplace"
+              >
+                <option value="">All countries</option>
+                {countryOptions.map((e) => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
+              <select
+                value={folderMinRating}
+                onChange={(e) => setFolderMinRating(e.target.value)}
+                className="w-full px-2 py-1 rounded-md bg-secondary border border-border text-[11px]"
+                title="Minimum TPDB rating"
+              >
+                <option value="">Any rating</option>
+                {[9, 8, 7, 6, 5].map((r) => (
+                  <option key={r} value={r}>{r}+ rating</option>
+                ))}
+              </select>
+            </div>
+            {(folderQuery || folderEthnicity || folderCountry || folderMinRating !== '') && (
+              <button
+                type="button"
+                className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                onClick={() => {
+                  setFolderQuery('')
+                  setFolderEthnicity('')
+                  setFolderCountry('')
+                  setFolderMinRating('')
+                }}
+              >
+                Clear folder filters
+              </button>
+            )}
+          </div>
           {libraries.length === 0 && (
             <p className="text-sm text-muted-foreground px-1 py-3">No libraries yet. Hit Add folder.</p>
+          )}
+          {sortedLibraries.length === 0 && libraries.length > 0 && (
+            <p className="text-xs text-muted-foreground px-1 py-2">No folders match filters.</p>
           )}
           {sortedLibraries.map((lib) => (
             <button
