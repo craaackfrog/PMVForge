@@ -497,7 +497,11 @@ export default function LibrariesPage() {
                 <Library size={14} className="shrink-0" />
                 <span className="truncate">{lib.name}</span>
               </div>
-              <div className="text-xs mt-0.5 opacity-70 pl-5">{lib.clip_count} clips</div>
+              <div className="text-xs mt-0.5 opacity-70 pl-5">
+                {lib.clip_count} clips
+                {lib.performer?.ethnicity ? ` · ${lib.performer.ethnicity}` : ''}
+                {lib.performer?.rating != null && lib.performer.rating !== '' ? ` · ★${Number(lib.performer.rating).toFixed(1)}` : ''}
+              </div>
             </button>
           ))}
         </aside>
