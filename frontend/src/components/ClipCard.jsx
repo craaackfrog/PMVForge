@@ -1,4 +1,4 @@
-import { Play, Pencil, Check } from 'lucide-react'
+import { Play, Pencil, Check, Flame } from 'lucide-react'
 import { playClick } from '../lib/sounds'
 import { cn } from '../lib/utils'
 
@@ -96,6 +96,15 @@ export default function ClipCard({
             <Pencil size={12} />
             Edit
           </button>
+          <div className="flex gap-0.5" title={`Heat ${clip.heat || 3}`}>
+            {[1, 2, 3, 4, 5].map((h) => (
+              <Flame
+                key={h}
+                size={14}
+                className={(clip.heat || 3) >= h ? 'text-orange-400 fill-orange-400' : 'text-white/35'}
+              />
+            ))}
+          </div>
         </div>
       </div>
 

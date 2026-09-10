@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, Save, Loader2, Search } from 'lucide-react'
+import { X, Save, Loader2, Search, Flame } from 'lucide-react'
 import { playTap, playDone, playError } from '../lib/sounds'
 
 const EXIT_MS = 220
@@ -25,6 +25,7 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
     poster: scene.poster || '',
     url: scene.url || '',
     filename: clip?.name || (clip?.path || '').split(/[/\\]/).pop() || '',
+    heat: clip?.heat || 3,
   })
 
   useEffect(() => {
@@ -78,6 +79,17 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.detail || res.statusText)
       let finalClip = data.clip || data
+      if (form.heat != null) {
+        const hr = await fetch(`/api/libraries/${libraryId}/clip`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: finalClip.path || clip.path, heat: form.heat }),
+        })
+        if (hr.ok) {
+          const hd = await hr.json().catch(() => ({}))
+          finalClip = { ...finalClip, ...(hd.clip || hd), heat: form.heat }
+        }
+      }
       const desired = (form.filename || '').trim()
       const currentName = clip.name || (clip.path || '').split(/[/\\]/).pop()
       if (desired && desired !== currentName) {
@@ -140,6 +152,25 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
             />
           )}
           <Field label="Title" value={form.title} onChange={(v) => update('title', v)} />
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Heat</p>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => update('heat', h)}
+                  className="p-1.5 rounded-md hover:bg-secondary"
+                  title={`Heat ${h}`}
+                >
+                  <Flame
+                    size={20}
+                    className={form.heat >= h ? 'text-orange-500 fill-orange-500' : 'text-muted-foreground'}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
           <Field
             label="Filename"
             value={form.filename}
