@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { X, Loader2, Search, Check, Link2 } from 'lucide-react'
 import { playTap, playDone, playError, playClick } from '../lib/sounds'
 
@@ -11,7 +11,7 @@ const EXIT_MS = 220
 export default function SceneMatchModal({ libraryId, libraryName, clip, onClose, onApplied }) {
   const [visible, setVisible] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const closedRef = useState({ current: false })[0]
+  const closedRef = useRef(false)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
@@ -318,20 +318,8 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
                   </label>
                 </div>
 
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Filename on apply</label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                  <p className="text-[10px] text-muted-foreground mt-1">
-                    Edit before apply (e.g. add 4K / no-intro) so hardlinks do not collide.
-                  </p>
-                </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Apply renames to the filename above and pushes scene tags.
+                  Apply saves scene metadata and tags. Rename the file from Edit clip metadata.
                 </p>
               </>
             )}
