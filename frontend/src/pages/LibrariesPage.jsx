@@ -788,6 +788,8 @@ export default function LibrariesPage() {
         <ClipEditModal
           libraryId={activeId}
           clip={editClip}
+          libraries={libraries}
+          allTags={allTags}
           onClose={() => setEditClip(null)}
           onSaved={async () => {
             setEditClip(null)

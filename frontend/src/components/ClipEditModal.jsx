@@ -8,7 +8,7 @@ const EXIT_MS = 220
  * Edit stored scene metadata for a clip.
  * "Match clip" opens ThePornDB matcher from here.
  */
-export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMatch }) {
+export default function ClipEditModal({ libraryId, clip, libraries = [], allTags = [], onClose, onSaved, onMatch }) {
   const scene = clip?.scene || {}
   const [visible, setVisible] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -20,13 +20,18 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
     title: scene.title || '',
     date: scene.date || '',
     studio: scene.studio || '',
-    performers: Array.isArray(scene.performers) ? scene.performers.join(', ') : '',
-    tags: Array.isArray(scene.tags) ? scene.tags.join(', ') : '',
+    performers: Array.isArray(scene.performers) ? [...scene.performers] : [],
+    tags: Array.isArray(scene.tags)
+      ? [...scene.tags]
+      : Array.isArray(clip?.tags)
+        ? [...clip.tags]
+        : [],
     poster: scene.poster || '',
     url: scene.url || '',
     filename: clip?.name || (clip?.path || '').split(/[/\\]/).pop() || '',
     heat: clip?.heat || 3,
   })
+  const [perfQuery, setPerfQuery] = useState('')
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))
@@ -181,10 +186,90 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
             <Field label="Date" value={form.date} onChange={(v) => update('date', v)} placeholder="YYYY-MM-DD" />
             <Field label="Studio" value={form.studio} onChange={(v) => update('studio', v)} />
           </div>
-          <Field label="Performers" value={form.performers} onChange={(v) => update('performers', v)} hint="Comma-separated" />
-          <Field label="Tags" value={form.tags} onChange={(v) => update('tags', v)} hint="Comma-separated" />
-          <Field label="Cover URL" value={form.poster} onChange={(v) => update('poster', v)} hint="ThePornDB poster URL used on the grid" />
-          <Field label="TPDB URL" value={form.url} onChange={(v) => update('url', v)} />
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Performers</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {form.performers.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      performers: f.performers.filter((n) => n !== name),
+                    }))
+                  }
+                  className="px-2 py-0.5 rounded-full text-xs bg-primary text-primary-foreground"
+                  title="Remove"
+                >
+                  {name} ×
+                </button>
+              ))}
+              {!form.performers.length && (
+                <span className="text-[11px] text-muted-foreground">None selected</span>
+              )}
+            </div>
+            <input
+              type="search"
+              value={perfQuery}
+              onChange={(e) => setPerfQuery(e.target.value)}
+              placeholder="Search libraries…"
+              className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm mb-1.5"
+            />
+            <div className="max-h-28 overflow-y-auto flex flex-wrap gap-1.5">
+              {(libraries || [])
+                .map((l) => l.name)
+                .filter(Boolean)
+                .filter((n, i, a) => a.findIndex((x) => x.toLowerCase() === n.toLowerCase()) === i)
+                .filter((n) => !form.performers.some((p) => p.toLowerCase() === n.toLowerCase()))
+                .filter((n) => !perfQuery.trim() || n.toLowerCase().includes(perfQuery.trim().toLowerCase()))
+                .slice(0, 40)
+                .map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({ ...f, performers: [...f.performers, name] }))
+                    }
+                    className="px-2 py-0.5 rounded-full text-xs bg-secondary hover:bg-accent text-muted-foreground hover:text-foreground"
+                  >
+                    + {name}
+                  </button>
+                ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Tags</p>
+            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+              {(allTags || []).map((tag) => {
+                const on = form.tags.map((x) => x.toLowerCase()).includes(tag.toLowerCase())
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        tags: on
+                          ? f.tags.filter((x) => x.toLowerCase() !== tag.toLowerCase())
+                          : [...f.tags, tag],
+                      }))
+                    }
+                    className={
+                      on
+                        ? 'px-2 py-0.5 rounded-full text-xs bg-primary text-primary-foreground'
+                        : 'px-2 py-0.5 rounded-full text-xs bg-secondary hover:bg-accent text-muted-foreground'
+                    }
+                  >
+                    {tag}
+                  </button>
+                )
+              })}
+              {!(allTags || []).length && (
+                <span className="text-[11px] text-muted-foreground">No tags in vocabulary yet</span>
+              )}
+            </div>
+          </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
 
