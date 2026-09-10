@@ -52,7 +52,6 @@ export default function LibrariesPage() {
   const [matchClip, setMatchClip] = useState(null)
   const [renameClip, setRenameClip] = useState(null)
   const [renameValue, setRenameValue] = useState('')
-
   const [showHelp, setShowHelp] = useState(false)
   const [folderSort, setFolderSort] = useState('az') // az | za
 
@@ -567,6 +566,18 @@ export default function LibrariesPage() {
                         >
                           <Pencil size={14} />
                         </button>
+                        <button
+                          type="button"
+                          title="Rename file"
+                          onClick={() => {
+                            playClick()
+                            setRenameClip(clip)
+                            setRenameValue(clip.name || clip.path.split(/[/\\]/).pop() || '')
+                          }}
+                          className="shrink-0 px-1.5 py-1 rounded-md bg-secondary hover:bg-accent text-[10px] font-mono text-muted-foreground"
+                        >
+                          Aa
+                        </button>
 
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="text-sm font-medium truncate" title={clip.path}>
@@ -712,6 +723,7 @@ export default function LibrariesPage() {
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}
               className="w-full px-3 py-2 rounded-md bg-secondary border border-border text-sm font-mono"
+              autoFocus
             />
             <div className="flex justify-end gap-2">
               <button type="button" className="px-3 py-1.5 text-sm rounded-md hover:bg-secondary" onClick={() => setRenameClip(null)}>Cancel</button>

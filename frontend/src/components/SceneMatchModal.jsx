@@ -221,13 +221,13 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
                         : 'w-full text-left flex gap-3 p-2 rounded-md hover:bg-secondary border border-transparent'
                     }
                   >
-                    <div className="w-16 h-12 rounded bg-secondary shrink-0 overflow-hidden">
+                    <div className="w-16 h-18 rounded bg-secondary shrink-0 overflow-hidden">
                       {r.poster ? (
                         <img src={r.poster} alt="" className="w-full h-full object-cover" />
                       ) : null}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{r.title || 'Untitled'}</p>
+                      <p className="text-lg font-serif font-medium truncate">{r.title || 'Untitled'}</p>
                       <p className="text-[11px] text-muted-foreground truncate">
                         {[r.studio, r.date, r.kind].filter(Boolean).join(' · ')}
                       </p>

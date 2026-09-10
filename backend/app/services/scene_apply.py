@@ -281,7 +281,7 @@ def apply_scene_match(
 
 
 def rename_clip_only(lib_id: str, path: str, filename: str) -> Dict[str, Any]:
-    """Rename a clip on disk and update library index (post-match edits)."""
+    """Rename a clip on disk and update library index."""
     lib = store.load_library(lib_id)
     if not lib:
         raise ValueError("Library not found")

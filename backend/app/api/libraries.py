@@ -260,7 +260,7 @@ class SceneApplyRequest(BaseModel):
     path: str
     scene: dict
     rename: bool = True
-    filename: Optional[str] = None  # custom name (with or without extension)
+    filename: Optional[str] = None
     push_tags: bool = True
     link_performers: Optional[List[str]] = None  # None = all female co-stars
     create_missing_libraries: bool = True
@@ -289,11 +289,8 @@ async def scene_search(lib_id: str, req: SceneSearchRequest):
         raise HTTPException(400, str(e))
 
 
-
-
 @router.post("/{lib_id}/clip/rename")
 async def clip_rename(lib_id: str, body: dict):
-    """Rename a clip file after the fact (e.g. 1080p vs 4K variants)."""
     from ..services import scene_apply as sa
     path = body.get("path") or ""
     filename = body.get("filename") or ""
