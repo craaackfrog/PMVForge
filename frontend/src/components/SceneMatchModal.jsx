@@ -21,7 +21,6 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
   const [error, setError] = useState(null)
   const [linkNames, setLinkNames] = useState([])
   const [createMissing, setCreateMissing] = useState(true)
-  const [editName, setEditName] = useState('')
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setVisible(true))
@@ -81,19 +80,6 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
     }
   }
 
-  function stashName(scene) {
-    const females = (scene.performers_female || scene.performers || [])
-      .map((p) => p.name)
-      .filter(Boolean)
-    const studio = (scene.studio || 'Unknown').replace(/[<>:"/\\|?*]/g, '').trim()
-    const title = (scene.title || 'Untitled').replace(/[<>:"/\\|?*]/g, '').trim()
-    const date = (scene.date || '0000-00-00').slice(0, 10)
-    const perf = females.join(', ')
-    const ext = (clip?.name || clip?.path || '.mp4').split('.').pop() || 'mp4'
-    let base = `${studio} - ${date} - ${title}`
-    if (perf) base += ` [${perf}]`
-    return `${base}.${ext}`
-  }
 
   function pick(scene) {
     playClick()
@@ -105,7 +91,6 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
       (n) => n.toLowerCase() !== (libraryName || '').toLowerCase(),
     )
     setLinkNames(others)
-    setEditName(stashName(scene))
   }
 
   function toggleLink(name) {
@@ -126,8 +111,7 @@ export default function SceneMatchModal({ libraryId, libraryName, clip, onClose,
         body: JSON.stringify({
           path: clip.path,
           scene: selected,
-          rename: true,
-          filename: editName || undefined,
+          rename: false,
           push_tags: true,
           link_performers: linkNames,
           create_missing_libraries: createMissing,

@@ -316,7 +316,7 @@ async def scene_search(lib_id: str, req: SceneSearchRequest):
 async def patch_clip_scene(lib_id: str, body: dict):
     from ..services import scene_apply as sa
     path = body.get("path") or ""
-    scene = body.get("scene") or body
+    scene = body.get("scene") or {}
     try:
         return sa.update_clip_scene(lib_id, path, scene)
     except ValueError as e:

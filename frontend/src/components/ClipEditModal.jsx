@@ -24,6 +24,7 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
     tags: Array.isArray(scene.tags) ? scene.tags.join(', ') : '',
     poster: scene.poster || '',
     url: scene.url || '',
+    filename: clip?.name || (clip?.path || '').split(/[/\\]/).pop() || '',
   })
 
   useEffect(() => {
@@ -76,8 +77,21 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.detail || res.statusText)
+      let finalClip = data.clip || data
+      const desired = (form.filename || '').trim()
+      const currentName = clip.name || (clip.path || '').split(/[/\\]/).pop()
+      if (desired && desired !== currentName) {
+        const rr = await fetch(`/api/libraries/${libraryId}/clip/rename`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: finalClip.path || clip.path, filename: desired }),
+        })
+        const rd = await rr.json().catch(() => ({}))
+        if (!rr.ok) throw new Error(rd.detail || rr.statusText)
+        finalClip = rd.clip || rd
+      }
       playDone()
-      onSaved?.(data.clip || data)
+      onSaved?.(finalClip)
       requestClose()
     } catch (e) {
       playError()
@@ -126,6 +140,12 @@ export default function ClipEditModal({ libraryId, clip, onClose, onSaved, onMat
             />
           )}
           <Field label="Title" value={form.title} onChange={(v) => update('title', v)} />
+          <Field
+            label="Filename"
+            value={form.filename}
+            onChange={(v) => update('filename', v)}
+            hint="Renames the file on disk when you Save"
+          />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Date" value={form.date} onChange={(v) => update('date', v)} placeholder="YYYY-MM-DD" />
             <Field label="Studio" value={form.studio} onChange={(v) => update('studio', v)} />
