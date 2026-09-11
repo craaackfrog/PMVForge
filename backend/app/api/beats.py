@@ -86,6 +86,7 @@ async def export_beatmap(
     format: str = Form("osu"),
     beats: str = Form(...),
     audio_filename: str = Form(""),
+    tempo: float = Form(0),
 ):
     """
     Export the (possibly manually edited) beat list to the requested format.
@@ -109,6 +110,7 @@ async def export_beatmap(
         output_dir=temp_dir,
         job_id=job_id,
         audio_filename=audio_filename,
+        bpm=float(tempo or 0),
     )
 
     return FileResponse(
@@ -213,3 +215,23 @@ async def export_edited_osu_endpoint(
         filename=out_name,
         media_type="application/octet-stream",
     )
+
+
+@router.get("/audio")
+async def stream_audio(path: str):
+    """Stream a host audio path for waveform preview (native picker)."""
+    from fastapi.responses import FileResponse
+    p = Path(path)
+    if not p.is_file():
+        raise HTTPException(404, f"Audio not found: {path}")
+    if p.suffix.lower() not in AUDIO_EXTS:
+        raise HTTPException(400, f"Unsupported audio format: {p.suffix}")
+    media = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+    }.get(p.suffix.lower(), "application/octet-stream")
+    return FileResponse(path=str(p.resolve()), media_type=media, filename=p.name)

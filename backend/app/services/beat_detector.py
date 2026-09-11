@@ -128,6 +128,7 @@ def export_beats(
     output_dir: Path = None,
     job_id: str = "export",
     audio_filename: str = "",
+    bpm: float = 0.0,
 ) -> Path:
     """
     Write beats to the requested format and return the output path.
@@ -160,6 +161,7 @@ def export_beats(
         creator=creator,
         output_path=out_path,
         audio_filename=audio_filename or "audio.ogg",
+        bpm=float(bpm) if bpm and bpm > 0 else 0.0,
     )
     return out_path
 
@@ -171,12 +173,26 @@ def _write_osu(
     creator: str,
     output_path: Path,
     version: str = "AutoBeats",
-    bpm: float = 120.0,
+    bpm: float = 0.0,
     audio_filename: str = "audio.ogg",
 ):
     times_ms = [int(round(t * 1000)) for t in beat_times]
     first_time = times_ms[0] if times_ms else 0
-    beat_length = 60000.0 / bpm if bpm > 0 else 500.0
+    # Prefer detected tempo; estimate from median gap if missing
+    if not bpm or bpm <= 0:
+        if len(beat_times) >= 2:
+            gaps = [beat_times[i + 1] - beat_times[i] for i in range(len(beat_times) - 1)]
+            gaps = [g for g in gaps if g > 0.05]
+            if gaps:
+                gaps_sorted = sorted(gaps)
+                median_gap = gaps_sorted[len(gaps_sorted) // 2]
+                bpm = 60.0 / median_gap if median_gap > 0 else 120.0
+            else:
+                bpm = 120.0
+        else:
+            bpm = 120.0
+    bpm = max(30.0, min(300.0, float(bpm)))
+    beat_length = 60000.0 / bpm
 
     lines = [
         "osu file format v14",

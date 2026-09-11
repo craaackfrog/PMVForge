@@ -96,6 +96,7 @@ export default function BeatCreatorPage() {
     form.append('creator', creator || APP_NAME)
     form.append('format', fmt)
     form.append('beats', JSON.stringify(beats))
+    if (result?.tempo) form.append('tempo', String(result.tempo))
     const audioName = (file && file.name) || (audioPath && audioPath.split(/[/\\]/).pop()) || ''
     if (audioName) form.append('audio_filename', audioName)
 
@@ -266,6 +267,11 @@ export default function BeatCreatorPage() {
             duration={result.duration}
             tempo={result.tempo}
             audioFile={file}
+            audioSrc={
+              !file && audioPath
+                ? `/api/beats/audio?path=${encodeURIComponent(audioPath)}`
+                : null
+            }
             onChange={setBeats}
           />
         </section>
