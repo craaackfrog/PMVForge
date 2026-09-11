@@ -51,15 +51,44 @@ DEFAULT_BITRATE = {
 
 # ── helpers ─────────────────────────────────────────────────
 
-def _run(cmd: List[str], timeout: Optional[int] = None) -> Tuple[int, str]:
-    p = subprocess.run(
+# Active ffmpeg PIDs for cooperative cancel (kill on request)
+_active_procs: List["subprocess.Popen"] = []
+
+
+def _run(cmd: List[str], timeout: Optional[int] = None, cancel_cb: Optional[Callable[[], bool]] = None) -> Tuple[int, str]:
+    proc = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        timeout=timeout,
     )
-    return p.returncode, p.stdout or ""
+    _active_procs.append(proc)
+    try:
+        try:
+            out, _ = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            out, _ = proc.communicate()
+            return 1, (out or "") + "\ntimeout"
+        return proc.returncode or 0, out or ""
+    finally:
+        try:
+            _active_procs.remove(proc)
+        except ValueError:
+            pass
+
+
+def kill_active_ffmpeg() -> int:
+    """Kill any in-flight ffmpeg processes started by this module."""
+    n = 0
+    for proc in list(_active_procs):
+        try:
+            if proc.poll() is None:
+                proc.kill()
+                n += 1
+        except Exception:
+            pass
+    return n
 
 
 def ffprobe_json(path: str) -> dict:
@@ -115,7 +144,7 @@ def load_beat_times(path: str) -> Tuple[List[float], Optional[str], str]:
 
     if p.is_dir():
         # pick first supported file inside
-        for ext in (".osu", ".txt", ".json", ".sm", ".ssc"):
+        for ext in (".osu", ".txt", ".json"):
             hits = list(p.glob(f"*{ext}"))
             if hits:
                 return load_beat_times(str(hits[0]))
@@ -215,7 +244,10 @@ def _probe_video(path: Path) -> Optional[SourceVideo]:
         info = ffprobe_json(str(path))
         vs = next(s for s in info["streams"] if s.get("codec_type") == "video")
         w, h = int(vs["width"]), int(vs["height"])
-        if w % 2 or h % 2:
+        # yuv420p needs even dims — keep the clip and let scale/pad evenize
+        w -= w % 2
+        h -= h % 2
+        if w < 2 or h < 2:
             return None
         dur = float(info["format"]["duration"])
         trim = min(10.0, dur * 0.1)
@@ -382,8 +414,14 @@ def plan_clips(
                 break
 
         if chosen is None:
+            # Exhaustion fallback: pick the longest usable source and a random
+            # valid window (or start_at if the clip is shorter than needed).
             v = max(pool, key=lambda x: x.usable)
-            src_start = min(v.start_at, max(v.start_at, v.end_at - dur))
+            max_start = max(v.start_at, v.end_at - dur)
+            if max_start > v.start_at:
+                src_start = v.start_at + random.random() * (max_start - v.start_at)
+            else:
+                src_start = v.start_at
             chosen = (v, src_start)
 
         v, src_start = chosen
@@ -442,8 +480,6 @@ def render_clip(
     zoom_to_fill: bool,
     cuda: bool,
 ) -> None:
-    encoder = "h264_nvenc" if cuda else "libx264"
-
     vf = build_scale_filter(
         plan.video.width,
         plan.video.height,
@@ -452,25 +488,31 @@ def render_clip(
         fps,
     )
 
-    cmd = [
-        "ffmpeg", "-hide_banner", "-y",
-        "-ss", timestamp(plan.src_start),
-        "-t", f"{plan.duration + 0.15:.4f}",
-        "-i", plan.video.path,
-        "-vf", vf,
-        "-an",
-        "-vframes", str(plan.framecount),
-        "-c:v", encoder,
-        "-b:v", bitrate,
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        plan.out_path,
-    ]
-    if cuda:
-        idx = cmd.index("-i")
-        cmd = cmd[:idx] + ["-hwaccel", "cuda"] + cmd[idx:]
+    def _build(use_cuda: bool) -> list:
+        encoder = "h264_nvenc" if use_cuda else "libx264"
+        cmd = [
+            "ffmpeg", "-hide_banner", "-y",
+            "-ss", timestamp(plan.src_start),
+            "-t", f"{plan.duration + 0.15:.4f}",
+            "-i", plan.video.path,
+            "-vf", vf,
+            "-an",
+            "-vframes", str(plan.framecount),
+            "-c:v", encoder,
+            "-b:v", bitrate,
+            "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+            plan.out_path,
+        ]
+        if use_cuda:
+            idx = cmd.index("-i")
+            cmd = cmd[:idx] + ["-hwaccel", "cuda"] + cmd[idx:]
+        return cmd
 
-    code, out = _run(cmd, timeout=300)
+    code, out = _run(_build(bool(cuda)), timeout=300)
+    if (code != 0 or not Path(plan.out_path).exists()) and cuda:
+        # NVENC missing / failed — fall back to software encode
+        code, out = _run(_build(False), timeout=300)
     if code != 0 or not Path(plan.out_path).exists():
         raise RuntimeError(f"Clip render failed ({plan.video.path}): {out[-400:]}")
 
@@ -644,6 +686,7 @@ class PMVGenerator:
             )
 
             if self.cancel_cb():
+                kill_active_ffmpeg()
                 return PMVJobResult(False, message="Cancelled", logs=self.logs)
 
             self._progress("Rendering clips…", 0.25)
@@ -663,6 +706,7 @@ class PMVGenerator:
                     if self.cancel_cb():
                         for f in futs:
                             f.cancel()
+                        kill_active_ffmpeg()
                         return PMVJobResult(False, message="Cancelled", logs=self.logs)
                     done += 1
                     if done % 5 == 0 or done == len(plans):
