@@ -334,14 +334,13 @@ def update_clip_scene(lib_id: str, path: str, scene_patch: dict) -> dict:
         tags = scene_patch["tags"]
         if isinstance(tags, str):
             tags = [x.strip().lower() for x in tags.split(",") if x.strip()]
-        scene["tags"] = list(tags or [])
-        # also merge into clip tags
-        clip_tags = set(clip.get("tags") or [])
-        for tg in scene["tags"]:
-            clip_tags.add(tg)
+        cleaned = sorted({str(t).strip().lower() for t in (tags or []) if str(t).strip()})
+        scene["tags"] = cleaned
+        # replace clip tags with the modal selection (allows unchecking)
+        clip["tags"] = list(cleaned)
+        for tg in cleaned:
             if tg not in lib.tags_vocab:
                 lib.tags_vocab.append(tg)
-        clip["tags"] = sorted(clip_tags)
     clip["scene"] = scene
     lib.clips[key] = clip
     store.save_library(lib)
