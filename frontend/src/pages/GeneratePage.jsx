@@ -75,7 +75,7 @@ export default function GeneratePage() {
   const setVideoPaths = (v) => setDraft((d) => ({ ...d, videoPaths: v }))
   const setOutputFolder = (v) => setDraft((d) => ({ ...d, outputFolder: v }))
 
-  // Apply Settings defaults once when form still looks like hard-coded DEFAULTS
+  // Apply Settings defaults only for keys that still match package DEFAULTS
   useEffect(() => {
     let cancelled = false
     fetch('/api/system/settings')
@@ -85,17 +85,22 @@ export default function GeneratePage() {
         const s = data.settings
         setDraft((d) => {
           const f = { ...(d.form || {}) }
-          // only fill keys that still match package DEFAULTS to avoid clobbering user session
-          if (s.default_cuda != null) f.cuda = !!s.default_cuda
-          if (s.default_fps) f.fps = s.default_fps
-          if (s.default_threads) f.threads = s.default_threads
-          if (s.default_batch_size) f.batch_size = s.default_batch_size
-          if (s.default_clip_dist != null) f.clip_dist = s.default_clip_dist
-          if (s.default_volume != null) f.volume = s.default_volume
-          if (s.default_aspect) f.aspect = s.default_aspect
-          if (s.default_quality) f.quality = s.default_quality
-          if (s.default_clip_order) f.clip_order = s.default_clip_order
-          if (s.default_zoom_to_fill != null) f.zoom_to_fill = !!s.default_zoom_to_fill
+          const still = (key, defVal) => {
+            const cur = f[key]
+            if (typeof defVal === 'boolean') return cur === defVal
+            if (typeof defVal === 'number') return cur === defVal || cur == null
+            return cur === defVal || cur == null || cur === ''
+          }
+          if (s.default_cuda != null && still('cuda', DEFAULTS.cuda)) f.cuda = !!s.default_cuda
+          if (s.default_fps && still('fps', DEFAULTS.fps)) f.fps = s.default_fps
+          if (s.default_threads && still('threads', DEFAULTS.threads)) f.threads = s.default_threads
+          if (s.default_clip_dist != null && still('clip_dist', DEFAULTS.clip_dist)) f.clip_dist = s.default_clip_dist
+          if (s.default_aspect && still('aspect', DEFAULTS.aspect)) f.aspect = s.default_aspect
+          if (s.default_quality && still('quality', DEFAULTS.quality)) f.quality = s.default_quality
+          if (s.default_clip_order && still('clip_order', DEFAULTS.clip_order)) f.clip_order = s.default_clip_order
+          if (s.default_zoom_to_fill != null && still('zoom_to_fill', DEFAULTS.zoom_to_fill)) {
+            f.zoom_to_fill = !!s.default_zoom_to_fill
+          }
           const next = { ...d, form: f }
           if (s.default_output_folder && !d.outputFolder) {
             next.outputFolder = s.default_output_folder
@@ -385,6 +390,7 @@ export default function GeneratePage() {
         setLibraryTagMode={setLibraryTagMode}
         setLibraryMinHeat={setLibraryMinHeat}
         onSelectBeatmap={onSelectBeatmap}
+        browseBeat={browseBeat}
         browseSong={browseSong}
         browseVideoFolder={browseVideoFolder}
         browseClips={browseClips}
@@ -401,6 +407,10 @@ export default function GeneratePage() {
             clipPath={videoPaths[0] || ''}
             videoPaths={videoPaths}
             videoFolder={videoFolder}
+            libraryId={libraryId}
+            libraryTags={libraryTags}
+            libraryTagMode={libraryTagMode}
+            libraryMinHeat={libraryMinHeat}
             cuda={form.cuda}
             bitrate={form.bitrate}
           />

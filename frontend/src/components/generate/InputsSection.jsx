@@ -10,7 +10,7 @@ export default function InputsSection({
   libraries, libTagVocab, libPreviewCount, picking,
   setBeatPath, setSongPath, setClipMode, setVideoFolder, setVideoPaths,
   setOutputFolder, setLibraryId, setLibraryTags, setLibraryTagMode, setLibraryMinHeat,
-  onSelectBeatmap, browseSong, browseVideoFolder, browseClips, browseOutput,
+  onSelectBeatmap, browseBeat, browseSong, browseVideoFolder, browseClips, browseOutput,
 }) {
   return (
     <details className="rounded-lg border border-border bg-card group" open>
@@ -23,6 +23,14 @@ export default function InputsSection({
         beatPath={beatPath}
         songPath={songPath}
         onSelectBeatmap={onSelectBeatmap}
+      />
+      <PathRow
+        label="Or pick a beatmap file"
+        value={beatPath}
+        placeholder="Select .osu / .txt / .json…"
+        onBrowse={browseBeat}
+        onClear={() => { setBeatPath(''); setSongPath('') }}
+        busy={picking === 'beat'}
       />
       <PathRow
         label="Song override (optional)"
