@@ -216,6 +216,35 @@ async def list_presets():
         "labels": {"hd": "HD", "fhd": "Full HD", "4k": "4K"},
     }
 
+class SampleClipRequest(BaseModel):
+    folder: str
+    recurse: bool = True
+
+
+@router.post("/sample-clip")
+async def sample_clip(body: SampleClipRequest):
+    """Pick a random usable video under a folder for effects preview."""
+    import random
+    root = Path(body.folder)
+    if not root.is_dir():
+        raise HTTPException(400, f"Folder not found: {body.folder}")
+    files = []
+    if body.recurse:
+        for ext in VIDEO_EXTS:
+            files.extend(root.rglob(f"*{ext}"))
+    else:
+        for f in root.iterdir():
+            if f.is_file() and f.suffix.lower() in VIDEO_EXTS:
+                files.append(f)
+    files = [f for f in files if f.is_file()]
+    if not files:
+        raise HTTPException(400, "No video files in folder")
+    random.shuffle(files)
+    pick = files[0]
+    return {"path": str(pick.resolve()), "name": pick.name}
+
+
+
 
 class StartPathsRequest(BaseModel):
     """Path-based start — no file uploads. Paths must exist on the backend host."""

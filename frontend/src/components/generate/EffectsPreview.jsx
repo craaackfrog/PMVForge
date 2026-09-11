@@ -8,6 +8,10 @@ export default function EffectsPreview({
   clipPath,
   videoPaths = [],
   videoFolder = '',
+  libraryId = '',
+  libraryTags = [],
+  libraryTagMode = 'any',
+  libraryMinHeat = 1,
   cuda = false,
   bitrate = '',
 }) {
@@ -15,19 +19,49 @@ export default function EffectsPreview({
   const [error, setError] = useState(null)
   const [src, setSrc] = useState(null)
 
+  async function resolveClipPath() {
+    if (clipPath) return clipPath
+    if (videoPaths?.length) {
+      return videoPaths[Math.floor(Math.random() * videoPaths.length)]
+    }
+    if (libraryId) {
+      const res = await fetch(`/api/libraries/${libraryId}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tags: libraryTags || [],
+          tag_mode: libraryTagMode || 'any',
+          min_heat: libraryMinHeat || 1,
+          max_heat: 5,
+          limit: 20,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail || res.statusText)
+      const paths = data.paths || (data.clips || []).map((c) => c.path).filter(Boolean)
+      if (!paths.length) throw new Error('Library query returned no clips for preview')
+      return paths[Math.floor(Math.random() * paths.length)]
+    }
+    if (videoFolder) {
+      const res = await fetch('/api/generate/sample-clip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: videoFolder, recurse: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail || res.statusText)
+      if (!data.path) throw new Error('No sample clip found in folder')
+      return data.path
+    }
+    throw new Error('Pick clips, a folder, or a library so preview has a source')
+  }
+
   async function run() {
     playTap()
     setError(null)
     setBusy(true)
     try {
-      let path = clipPath
-      if (!path && videoPaths?.length) {
-        path = videoPaths[Math.floor(Math.random() * videoPaths.length)]
-      }
-      if (!path) {
-        // ask backend would need a folder pick — require a known path
-        throw new Error('Pick at least one clip (or use Pick clips / Library) for a preview source')
-      }
+      const path = await resolveClipPath()
       const res = await fetch('/api/generate/effects-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
