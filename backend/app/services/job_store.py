@@ -103,7 +103,13 @@ def request_cancel(job_id: str) -> Optional[dict]:
         job["message"] = "Cancelled"
         job["updated_at"] = _now()
         _persist(job)
-        return dict(job)
+        result = dict(job)
+    try:
+        from .pmv_generator import kill_active_ffmpeg
+        kill_active_ffmpeg()
+    except Exception:
+        pass
+    return result
 
 def is_cancelled(job_id: str) -> bool:
     with _lock:
