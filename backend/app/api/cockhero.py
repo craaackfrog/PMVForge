@@ -15,6 +15,7 @@ import json
 from datetime import datetime
 
 from ..config import get_temp_dir, PROJECT_NAME
+from ..services import job_store
 from ..services.cockhero_renderer import (
     CockHeroOptions,
     CockHeroResult,
@@ -28,7 +29,6 @@ from ..services.cockhero_renderer import (
 router = APIRouter()
 
 _sessions: dict[str, dict] = {}
-_jobs: dict[str, dict] = {}
 
 
 def _now() -> str:
@@ -297,29 +297,28 @@ def _run_placeholder_frame(path: str, reason: str = "") -> None:
 
 
 def _run_ch_job(job_id: str, options: CockHeroOptions):
-    job = _jobs[job_id]
-    job["status"] = "running"
-    job["updated_at"] = _now()
+    job_store.update_job(job_id, status="running", message="Starting…", started_at=_now())
     started = datetime.utcnow()
 
     def progress_cb(msg: str, pct: float):
-        job["message"] = msg
-        job["progress"] = pct
-        job["updated_at"] = _now()
+        job_store.update_job(job_id, message=msg, progress=pct)
 
     result: CockHeroResult = render_cockhero(options, progress_cb=progress_cb)
     elapsed = (datetime.utcnow() - started).total_seconds()
-    job["updated_at"] = _now()
-    job["elapsed_seconds"] = result.elapsed or elapsed
-    job["progress"] = 1.0 if result.success else job.get("progress", 0)
-    job["status"] = "finished" if result.success else "error"
-    job["message"] = result.message
-    job["result"] = {
-        "success": result.success,
-        "output_video": result.output_video,
-        "logs": result.logs,
-        "elapsed_seconds": job["elapsed_seconds"],
-    }
+    job_store.update_job(
+        job_id,
+        status="finished" if result.success else "error",
+        message=result.message,
+        progress=1.0 if result.success else (job_store.get_job(job_id) or {}).get("progress", 0),
+        elapsed_seconds=result.elapsed or elapsed,
+        result={
+            "success": result.success,
+            "output_video": result.output_video,
+            "logs": result.logs,
+            "elapsed_seconds": result.elapsed or elapsed,
+        },
+    )
+
 
 
 @router.post("/render", response_model=JobStatus)
@@ -355,26 +354,19 @@ async def start_render(req: RenderRequest, background_tasks: BackgroundTasks):
         cuda=req.cuda,
     )
 
-    job_id = str(uuid.uuid4())
-    now = _now()
-    _jobs[job_id] = {
-        "job_id": job_id,
-        "status": "queued",
-        "progress": 0.0,
+    job = job_store.create_job({
         "message": "Queued",
-        "result": None,
-        "created_at": now,
-        "updated_at": now,
-        "elapsed_seconds": None,
         "session_id": req.session_id,
-    }
+        "kind": "cockhero",
+    })
+    job_id = job["job_id"]
     background_tasks.add_task(_run_ch_job, job_id, options)
-    return JobStatus(**{k: _jobs[job_id][k] for k in JobStatus.model_fields})
+    return JobStatus(**{k: job.get(k) for k in JobStatus.model_fields})
 
 
 @router.get("/status/{job_id}", response_model=JobStatus)
 async def job_status(job_id: str):
-    job = _jobs.get(job_id)
+    job = job_store.get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
     return JobStatus(
@@ -391,7 +383,7 @@ async def job_status(job_id: str):
 
 @router.get("/video/{job_id}")
 async def stream_video(job_id: str):
-    job = _jobs.get(job_id)
+    job = job_store.get_job(job_id)
     if not job or job.get("status") != "finished":
         raise HTTPException(404, "Not ready")
     path = (job.get("result") or {}).get("output_video")
@@ -402,7 +394,7 @@ async def stream_video(job_id: str):
 
 @router.get("/download/{job_id}")
 async def download_video(job_id: str):
-    job = _jobs.get(job_id)
+    job = job_store.get_job(job_id)
     if not job:
         raise HTTPException(404, "Not found")
     path = (job.get("result") or {}).get("output_video")
