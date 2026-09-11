@@ -29,9 +29,7 @@ const empty = {
   default_cuda: false,
   default_fps: 30,
   default_threads: 4,
-  default_batch_size: 10,
   default_clip_dist: 0.4,
-  default_volume: 0,
   default_aspect: '16:9',
   default_quality: 'hd',
   default_clip_order: 'random',
@@ -261,27 +259,12 @@ export default function SettingsPage() {
             max={32}
           />
           <NumberField
-            label="Batch size"
-            value={form.default_batch_size}
-            onChange={(v) => update('default_batch_size', v)}
-            min={1}
-            max={50}
-          />
-          <NumberField
             label="Clip distance"
             value={form.default_clip_dist}
             onChange={(v) => update('default_clip_dist', v)}
             step={0.05}
             min={0}
             max={2}
-          />
-          <NumberField
-            label="Beatbar volume"
-            value={form.default_volume}
-            onChange={(v) => update('default_volume', v)}
-            step={0.1}
-            min={0}
-            max={1}
           />
         </div>
         <Toggle

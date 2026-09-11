@@ -46,7 +46,7 @@ CORS_ORIGINS: list[str] = [
 # ─────────────────────────────────────────────────────────────
 # FEATURE FLAGS / DEFAULTS
 # ─────────────────────────────────────────────────────────────
-DEFAULT_FPS: int = 25
+DEFAULT_FPS: int = 30
 DEFAULT_RESOLUTION: str = "1280:720"
 DEFAULT_BITRATE: str = "3M"
 DEFAULT_THREADS: int = 4

@@ -2,7 +2,7 @@ export const DEFAULTS = {
   clip_dist: 0.4,
   aspect: '16:9',
   quality: 'hd',
-  zoom_to_fill: false,
+  zoom_to_fill: true,
   clip_order: 'random',
   fps: 30,
   bitrate: '',

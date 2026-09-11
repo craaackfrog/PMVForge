@@ -34,9 +34,7 @@ class SettingsPatch(BaseModel):
     default_cuda: Optional[bool] = None
     default_fps: Optional[int] = None
     default_threads: Optional[int] = None
-    default_batch_size: Optional[int] = None
     default_clip_dist: Optional[float] = None
-    default_volume: Optional[float] = None
     default_aspect: Optional[str] = None
     default_quality: Optional[str] = None
     default_clip_order: Optional[str] = None

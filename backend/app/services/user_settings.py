@@ -14,9 +14,7 @@ from ..config import (
     DEFAULT_TEMP_DIR,
     DEFAULT_FPS,
     DEFAULT_THREADS,
-    DEFAULT_BATCH_SIZE,
     DEFAULT_CLIP_DIST,
-    DEFAULT_VOLUME,
 )
 
 DEFAULTS: Dict[str, Any] = {
@@ -25,9 +23,7 @@ DEFAULTS: Dict[str, Any] = {
     "default_cuda": False,
     "default_fps": DEFAULT_FPS,
     "default_threads": DEFAULT_THREADS,
-    "default_batch_size": DEFAULT_BATCH_SIZE,
     "default_clip_dist": DEFAULT_CLIP_DIST,
-    "default_volume": DEFAULT_VOLUME,
     "default_aspect": "16:9",
     "default_quality": "hd",
     "default_clip_order": "random",
