@@ -73,14 +73,17 @@ export default function WaveformEditor({
 
   // ── Audio element ────────────────────────────────────────
   useEffect(() => {
-    if (!audioFile) {
-      setAudioUrl(null)
+    if (audioFile) {
+      const url = URL.createObjectURL(audioFile)
+      setAudioUrl(url)
+      return () => URL.revokeObjectURL(url)
+    }
+    if (audioSrc) {
+      setAudioUrl(audioSrc)
       return
     }
-    const url = URL.createObjectURL(audioFile)
-    setAudioUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [audioFile])
+    setAudioUrl(null)
+  }, [audioFile, audioSrc])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -495,7 +498,7 @@ export default function WaveformEditor({
         <canvas
           ref={canvasRef}
           style={{
-            margin: '1em',
+            margin: 0,
             width: '100%',
             height,
             display: 'block',
