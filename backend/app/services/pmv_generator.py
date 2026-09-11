@@ -302,6 +302,7 @@ class ClipPlan:
     duration: float
     framecount: int
     out_path: str
+    volume: float = 1.0  # clip (moan) gain for this segment
 
 
 def _gaps_after(
@@ -442,6 +443,69 @@ def plan_clips(
 
 
 
+
+def plans_from_edl(
+    edl_clips: List[dict],
+    fps: int,
+    work_dir: Path,
+) -> List[ClipPlan]:
+    """
+    Build ClipPlan list from a UI-owned EDL.
+    Each item: {path, src_in, src_out, volume?, order?}
+    Duration is driven by src_out - src_in (already beat-aligned by the UI).
+    """
+    frame_time = 1.0 / max(1, fps)
+    plans: List[ClipPlan] = []
+    cache: dict[str, SourceVideo] = {}
+    for i, row in enumerate(edl_clips):
+        path = str(row.get("path") or "")
+        if not path:
+            continue
+        if path not in cache:
+            v = _probe_video(Path(path))
+            if not v:
+                raise RuntimeError(f"Unusable EDL clip: {path}")
+            cache[path] = v
+        v = cache[path]
+        src_in = float(row.get("src_in") or row.get("srcIn") or v.start_at)
+        src_out = float(row.get("src_out") or row.get("srcOut") or (src_in + 0.4))
+        dur = max(0.04, src_out - src_in)
+        frames = max(1, int(round(dur / frame_time)))
+        dur = frames * frame_time
+        src_in = max(v.start_at, min(src_in, max(v.start_at, v.end_at - dur)))
+        vol = float(row.get("volume") if row.get("volume") is not None else 1.0)
+        vol = max(0.0, min(2.0, vol))
+        out = str(work_dir / f"clip_{i:05d}.mp4")
+        plans.append(ClipPlan(i, v, src_in, dur, frames, out, volume=vol))
+    if not plans:
+        raise RuntimeError("EDL produced no clips")
+    return plans
+
+
+def edl_from_plans(plans: List[ClipPlan], beats: List[float]) -> List[dict]:
+    """Serialize plans back to a UI EDL (one row per planned segment)."""
+    rows = []
+    for i, p in enumerate(plans):
+        beat_in = beats[i] if i < len(beats) else 0.0
+        beat_out = beats[i + 1] if i + 1 < len(beats) else beat_in + p.duration
+        rows.append({
+            "id": f"seg-{i}",
+            "path": p.video.path,
+            "name": Path(p.video.path).name,
+            "src_in": round(p.src_start, 4),
+            "src_out": round(p.src_start + p.duration, 4),
+            "beat_in": round(float(beat_in), 4),
+            "beat_out": round(float(beat_out), 4),
+            "duration": round(p.duration, 4),
+            "volume": float(getattr(p, "volume", 1.0)),
+            "order": i,
+            "width": p.video.width,
+            "height": p.video.height,
+        })
+    return rows
+
+
+
 def build_scale_filter(
     src_w: int,
     src_h: int,
@@ -479,6 +543,7 @@ def render_clip(
     fps: int,
     zoom_to_fill: bool,
     cuda: bool,
+    keep_audio: bool = False,
 ) -> None:
     vf = build_scale_filter(
         plan.video.width,
@@ -487,8 +552,9 @@ def render_clip(
         zoom_to_fill,
         fps,
     )
+    vol = float(getattr(plan, "volume", 1.0) or 0.0)
 
-    def _build(use_cuda: bool) -> list:
+    def _build(use_cuda: bool, with_audio: bool) -> list:
         encoder = "h264_nvenc" if use_cuda else "libx264"
         cmd = [
             "ffmpeg", "-hide_banner", "-y",
@@ -496,11 +562,42 @@ def render_clip(
             "-t", f"{plan.duration + 0.15:.4f}",
             "-i", plan.video.path,
             "-vf", vf,
-            "-an",
             "-vframes", str(plan.framecount),
             "-c:v", encoder,
             "-b:v", bitrate,
             "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
+        ]
+        if with_audio:
+            cmd.extend([
+                "-af", f"volume={vol:.4f},aformat=sample_rates=48000:channel_layouts=stereo",
+                "-c:a", "aac", "-b:a", "192k",
+            ])
+        else:
+            cmd.append("-an")
+        cmd.append(plan.out_path)
+        if use_cuda:
+            idx = cmd.index("-i")
+            cmd = cmd[:idx] + ["-hwaccel", "cuda"] + cmd[idx:]
+        return cmd
+
+    def _build_silent_pad(use_cuda: bool) -> list:
+        """Video has no audio stream — generate silent AAC so concat stays uniform."""
+        encoder = "h264_nvenc" if use_cuda else "libx264"
+        cmd = [
+            "ffmpeg", "-hide_banner", "-y",
+            "-ss", timestamp(plan.src_start),
+            "-t", f"{plan.duration + 0.15:.4f}",
+            "-i", plan.video.path,
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
+            "-vf", vf,
+            "-vframes", str(plan.framecount),
+            "-map", "0:v", "-map", "1:a",
+            "-c:v", encoder,
+            "-b:v", bitrate,
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k",
+            "-shortest",
             "-movflags", "+faststart",
             plan.out_path,
         ]
@@ -509,12 +606,25 @@ def render_clip(
             cmd = cmd[:idx] + ["-hwaccel", "cuda"] + cmd[idx:]
         return cmd
 
-    code, out = _run(_build(bool(cuda)), timeout=300)
-    if (code != 0 or not Path(plan.out_path).exists()) and cuda:
-        # NVENC missing / failed — fall back to software encode
-        code, out = _run(_build(False), timeout=300)
-    if code != 0 or not Path(plan.out_path).exists():
-        raise RuntimeError(f"Clip render failed ({plan.video.path}): {out[-400:]}")
+    attempts = []
+    if keep_audio:
+        attempts.append(lambda: _build(bool(cuda), True))
+        if cuda:
+            attempts.append(lambda: _build(False, True))
+        attempts.append(lambda: _build_silent_pad(False))
+    else:
+        attempts.append(lambda: _build(bool(cuda), False))
+        if cuda:
+            attempts.append(lambda: _build(False, False))
+
+    last_out = ""
+    for make in attempts:
+        code, out = _run(make(), timeout=300)
+        last_out = out
+        if code == 0 and Path(plan.out_path).exists():
+            return
+    raise RuntimeError(f"Clip render failed ({plan.video.path}): {last_out[-400:]}")
+
 
 
 def concat_clips(plans: List[ClipPlan], out_path: Path) -> None:
@@ -547,21 +657,67 @@ def concat_clips(plans: List[ClipPlan], out_path: Path) -> None:
             raise RuntimeError(f"Concat failed: {out[-400:]}")
 
 
-def mux_audio(video_path: Path, audio_path: str, out_path: Path, length: float) -> None:
-    cmd = [
-        "ffmpeg", "-hide_banner", "-y",
-        "-i", str(video_path),
-        "-i", audio_path,
-        "-map", "0:v", "-map", "1:a",
-        "-c:v", "copy",
-        "-c:a", "aac", "-b:a", "192k",
-        "-shortest",
-        "-t", f"{length:.3f}",
-        str(out_path),
-    ]
+def mux_audio(
+    video_path: Path,
+    audio_path: str,
+    out_path: Path,
+    length: float,
+    song_volume: float = 1.0,
+    mix_clip_audio: bool = False,
+) -> None:
+    """
+    Attach song audio. When mix_clip_audio is True, amix song with
+    whatever audio is already on the video (clip moans from render_clip).
+    """
+    song_vol = max(0.0, min(2.0, float(song_volume)))
+    if mix_clip_audio:
+        # 0 = video(+clip audio), 1 = song
+        fc = (
+            f"[0:a]volume=1.0[a0];"
+            f"[1:a]volume={song_vol:.4f}[a1];"
+            f"[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+        )
+        cmd = [
+            "ffmpeg", "-hide_banner", "-y",
+            "-i", str(video_path),
+            "-i", audio_path,
+            "-filter_complex", fc,
+            "-map", "0:v", "-map", "[aout]",
+            "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "192k",
+            "-t", f"{length:.3f}",
+            str(out_path),
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-hide_banner", "-y",
+            "-i", str(video_path),
+            "-i", audio_path,
+            "-map", "0:v", "-map", "1:a",
+            "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "192k",
+            "-af", f"volume={song_vol:.4f}",
+            "-shortest",
+            "-t", f"{length:.3f}",
+            str(out_path),
+        ]
     code, out = _run(cmd, timeout=600)
     if code != 0:
-        raise RuntimeError(f"Audio mux failed: {out[-400:]}")
+        # fallback: song only (old behaviour)
+        cmd = [
+            "ffmpeg", "-hide_banner", "-y",
+            "-i", str(video_path),
+            "-i", audio_path,
+            "-map", "0:v", "-map", "1:a",
+            "-c:v", "copy",
+            "-c:a", "aac", "-b:a", "192k",
+            "-shortest",
+            "-t", f"{length:.3f}",
+            str(out_path),
+        ]
+        code, out = _run(cmd, timeout=600)
+        if code != 0:
+            raise RuntimeError(f"Audio mux failed: {out[-400:]}")
 
 
 
@@ -594,6 +750,12 @@ class PMVJobOptions:
 
     # Beat effects post-pass
     effects: Optional[dict] = None
+
+    # UI-owned EDL (optional). When set, skips plan_clips.
+    edl_clips: Optional[List[dict]] = None
+    song_volume: float = 1.0
+    default_clip_volume: float = 1.0
+    keep_clip_audio: bool = True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -679,7 +841,15 @@ class PMVGenerator:
 
             self._progress("Planning clips…", 0.18)
             order = getattr(opts, "clip_order", None) or "random"
-            plans = plan_clips(beats, videos, opts.fps, work_dir, order=order)
+            edl = getattr(opts, "edl_clips", None) or None
+            if edl:
+                plans = plans_from_edl(edl, opts.fps, work_dir)
+                self._log(f"EDL: {len(plans)} segments from UI")
+            else:
+                plans = plan_clips(beats, videos, opts.fps, work_dir, order=order)
+                dvol = float(getattr(opts, "default_clip_volume", 1.0) or 1.0)
+                for pl in plans:
+                    pl.volume = dvol
             self._log(
                 f"{len(plans)} clips planned · {resolution} @ {opts.fps}fps · "
                 f"order={order} · zoom_to_fill={zoom}"
@@ -698,6 +868,7 @@ class PMVGenerator:
                     return
                 render_clip(
                     plan, resolution, bitrate, opts.fps, zoom, opts.cuda,
+                    keep_audio=bool(getattr(opts, "keep_clip_audio", True)),
                 )
 
             with ThreadPoolExecutor(max_workers=max(1, opts.threads)) as ex:
@@ -739,7 +910,14 @@ class PMVGenerator:
             final_path = out_dir / f"{safe_name}.mp4"
 
             self._progress("Muxing audio…", 0.88)
-            mux_audio(silent, song, final_path, length)
+            mux_audio(
+                silent,
+                song,
+                final_path,
+                length,
+                song_volume=float(getattr(opts, "song_volume", 1.0) or 1.0),
+                mix_clip_audio=bool(getattr(opts, "keep_clip_audio", True)),
+            )
 
             # Optional beat-effects post-pass
             fx_raw = opts.effects if isinstance(getattr(opts, "effects", None), dict) else {}

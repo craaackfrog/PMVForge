@@ -2,7 +2,7 @@
 PMV generation endpoints.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Form, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional, List, Literal
@@ -270,6 +270,109 @@ class StartPathsRequest(BaseModel):
     threads: int = 4
     cuda: bool = False
     debug: bool = False
+
+    edl_clips: Optional[List[dict]] = None
+    song_volume: float = 1.0
+    default_clip_volume: float = 1.0
+    keep_clip_audio: bool = True
+
+
+
+
+class PlanEdlRequest(BaseModel):
+    beat_input: str
+    video_folder: str = ""
+    video_paths: List[str] = []
+    song_path: Optional[str] = None
+    recurse: bool = False
+    num_vids: int = 0
+    clip_order: Literal["random", "forward", "sticky"] = "random"
+    fps: int = 30
+    default_clip_volume: float = 1.0
+
+
+@router.post("/plan-edl")
+async def plan_edl(req: PlanEdlRequest):
+    """Fill an EDL from beats + clip pool without encoding."""
+    from ..services.pmv_generator import (
+        load_beat_times,
+        load_videos_from_paths,
+        scan_videos,
+        plan_clips,
+        edl_from_plans,
+    )
+    import tempfile
+
+    if not req.beat_input or not Path(req.beat_input).exists():
+        raise HTTPException(400, f"Beat input not found: {req.beat_input}")
+
+    try:
+        beats, song, display_name = load_beat_times(req.beat_input)
+    except Exception as e:
+        raise HTTPException(400, f"Failed to load beats: {e}")
+
+    if req.song_path and Path(req.song_path).exists():
+        song = req.song_path
+
+    if not beats or len(beats) < 2:
+        raise HTTPException(400, "Need at least 2 beat timestamps")
+
+    paths = [p for p in (req.video_paths or []) if p]
+    if paths:
+        videos = load_videos_from_paths(paths, limit=req.num_vids or 0)
+    elif req.video_folder:
+        if not Path(req.video_folder).is_dir():
+            raise HTTPException(400, f"Video folder not found: {req.video_folder}")
+        videos = scan_videos(req.video_folder, recurse=req.recurse, limit=req.num_vids or 0)
+    else:
+        raise HTTPException(400, "Provide video_paths or video_folder")
+
+    if not videos:
+        raise HTTPException(400, "No usable source videos")
+
+    work = Path(tempfile.mkdtemp(prefix="edl_plan_", dir=str(get_temp_dir())))
+    try:
+        plans = plan_clips(beats, videos, req.fps, work, order=req.clip_order)
+        dvol = float(req.default_clip_volume or 1.0)
+        for pl in plans:
+            pl.volume = dvol
+        edl = edl_from_plans(plans, beats)
+    finally:
+        try:
+            work.rmdir()
+        except Exception:
+            pass
+
+    return {
+        "beats": beats,
+        "song_path": song,
+        "display_name": display_name,
+        "clips": edl,
+        "count": len(edl),
+        "duration": beats[-1] if beats else 0,
+    }
+
+
+@router.get("/media")
+async def stream_generate_media(path: str = Query(...)):
+    """Stream any local media path for timeline source preview."""
+    pth = Path(path)
+    if not pth.is_file():
+        raise HTTPException(404, f"Not found: {path}")
+    suffix = pth.suffix.lower()
+    media = {
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mkv": "video/x-matroska",
+        ".mov": "video/quicktime",
+        ".avi": "video/x-msvideo",
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".flac": "audio/flac",
+        ".m4a": "audio/mp4",
+    }.get(suffix, "application/octet-stream")
+    return FileResponse(str(pth.resolve()), media_type=media, filename=pth.name)
 
 
 @router.post("/start", response_model=JobStatus)

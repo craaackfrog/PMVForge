@@ -19,6 +19,9 @@ import FormatSection from '../components/generate/FormatSection'
 import EffectsSection from '../components/generate/EffectsSection'
 import EffectsPreview from '../components/generate/EffectsPreview'
 import OptionsSection from '../components/generate/OptionsSection'
+import TimelinePanel from '../components/generate/TimelinePanel'
+import SourcePreview from '../components/generate/SourcePreview'
+import { emptyEdl } from '../components/generate/edl'
 
 export default function GeneratePage() {
   const navigate = useNavigate()
@@ -34,6 +37,7 @@ export default function GeneratePage() {
     libraryTags: [],
     libraryTagMode: 'any',
     libraryMinHeat: 1,
+    songVolume: 1,
   })
   const form = draft.form || DEFAULTS
   const beatPath = draft.beatPath || ''
@@ -46,6 +50,10 @@ export default function GeneratePage() {
   const libraryTags = draft.libraryTags || []
   const libraryTagMode = draft.libraryTagMode || 'any'
   const libraryMinHeat = draft.libraryMinHeat ?? 1
+  const songVolume = draft.songVolume ?? 1
+
+  const [edl, setEdl] = useState(() => emptyEdl())
+  const [planning, setPlanning] = useState(false)
 
   const updateEffect = (key, value) => {
     setForm((f) => ({
@@ -240,6 +248,79 @@ export default function GeneratePage() {
     }
   }
 
+  async function resolveClipPaths() {
+    let video_paths = clipMode === 'pick' ? videoPaths : []
+    let video_folder = clipMode === 'all' ? videoFolder : ''
+    if (clipMode === 'library') {
+      const q = await fetch(`/api/libraries/${libraryId}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tags: libraryTags,
+          tag_mode: libraryTagMode,
+          min_heat: libraryMinHeat,
+          max_heat: 5,
+          limit: form.num_vids || 0,
+        }),
+      })
+      if (!q.ok) throw new Error('Library query failed')
+      const data = await q.json()
+      video_paths = data.paths || (data.clips || []).map((c) => c.path)
+      if (!video_paths.length) throw new Error('No clips matched library filters')
+      video_folder = ''
+    }
+    return { video_paths, video_folder }
+  }
+
+  async function buildTimeline() {
+    const hasClips =
+      (clipMode === 'all' && videoFolder) ||
+      (clipMode === 'pick' && videoPaths.length > 0) ||
+      (clipMode === 'library' && libraryId)
+    if (!beatPath || !hasClips) {
+      setError('Need a beatmap and clips first')
+      playError()
+      return
+    }
+    setError(null)
+    setPlanning(true)
+    playTap()
+    try {
+      const { video_paths, video_folder } = await resolveClipPaths()
+      const res = await fetch('/api/generate/plan-edl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          beat_input: beatPath,
+          video_folder,
+          video_paths,
+          song_path: songPath || null,
+          recurse: !!form.recurse,
+          num_vids: form.num_vids || 0,
+          clip_order: form.clip_order || 'random',
+          fps: form.fps || 30,
+          default_clip_volume: 1,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.detail || res.statusText)
+      if (data.song_path && !songPath) setSongPath(data.song_path)
+      setEdl({
+        beats: data.beats || [],
+        clips: data.clips || [],
+        songPath: data.song_path || songPath || '',
+        songVolume,
+        duration: data.duration || 0,
+      })
+      playDone()
+    } catch (e) {
+      playError()
+      setError(e.message)
+    } finally {
+      setPlanning(false)
+    }
+  }
+
   async function startJob() {
     const hasClips =
       (clipMode === 'all' && videoFolder) ||
@@ -253,36 +334,28 @@ export default function GeneratePage() {
     setPreviewOpen(false)
     playStart()
     try {
-      let video_paths = clipMode === 'pick' ? videoPaths : []
-      let video_folder = clipMode === 'all' ? videoFolder : ''
-
-      if (clipMode === 'library') {
-        const q = await fetch(`/api/libraries/${libraryId}/query`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tags: libraryTags,
-            tag_mode: libraryTagMode,
-            min_heat: libraryMinHeat,
-            max_heat: 5,
-            limit: form.num_vids || 0,
-          }),
-        })
-        if (!q.ok) throw new Error('Library query failed')
-        const data = await q.json()
-        video_paths = data.paths || (data.clips || []).map((c) => c.path)
-        if (!video_paths.length) throw new Error('No clips matched library filters')
-        video_folder = ''
-      }
+      const { video_paths, video_folder } = await resolveClipPaths()
 
       const payload = {
         beat_input: beatPath,
         video_folder,
         video_paths,
         output_folder: outputFolder || '',
-        song_path: songPath || null,
+        song_path: songPath || edl.songPath || null,
         ...form,
         bitrate: form.bitrate || null,
+        song_volume: songVolume,
+        default_clip_volume: 1,
+        keep_clip_audio: true,
+        edl_clips: edl.clips?.length
+          ? edl.clips.map((c, i) => ({
+              path: c.path,
+              src_in: c.src_in,
+              src_out: c.src_out,
+              volume: c.volume ?? 1,
+              order: i,
+            }))
+          : null,
       }
       const res = await fetch('/api/generate/start-paths', {
         method: 'POST',
@@ -360,7 +433,7 @@ export default function GeneratePage() {
       <header>
         <h1 className="font-serif text-3xl tracking-tight">PMV Creator</h1>
         <p className="text-muted-foreground mt-1">
-          Paths stay on disk — native pickers, no uploading.
+          Timeline-first: build an EDL, preview sources, then render. Paths stay on disk.
         </p>
       </header>
 
@@ -398,6 +471,41 @@ export default function GeneratePage() {
       />
 
       <FormatSection form={form} update={update} resHint={resHint} />
+
+      <section className="rounded-lg border border-border bg-card p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-serif text-xl">Timeline & preview</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Fill the EDL from beats + clips, reorder, set moan volumes, preview sources. Encode only on Create PMV.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={buildTimeline}
+            disabled={planning || !canStart}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-secondary text-sm hover:bg-accent disabled:opacity-50"
+          >
+            {planning ? <Loader2 size={14} className="animate-spin" /> : null}
+            {edl.clips?.length ? 'Rebuild timeline' : 'Build timeline'}
+          </button>
+        </div>
+        <div className="grid lg:grid-cols-2 gap-5">
+          <TimelinePanel
+            clips={edl.clips || []}
+            beats={edl.beats || []}
+            songVolume={songVolume}
+            onSongVolume={(v) => setDraft((d) => ({ ...d, songVolume: v }))}
+            onChange={(clips) => setEdl((e) => ({ ...e, clips }))}
+          />
+          <SourcePreview
+            clips={edl.clips || []}
+            beats={edl.beats || []}
+            songPath={songPath || edl.songPath || ''}
+            songVolume={songVolume}
+          />
+        </div>
+      </section>
       <EffectsSection
         form={form}
         updateEffect={updateEffect}
