@@ -187,8 +187,11 @@ export default function LibrariesPage() {
 
   function selectAll() {
     playClick()
-    if (selected.size === clips.length) setSelected(new Set())
-    else setSelected(new Set(clips.map((c) => c.path)))
+    const paths = visibleClips.map((c) => c.path)
+    const allVisibleSelected =
+      paths.length > 0 && paths.every((p) => selected.has(p))
+    if (allVisibleSelected) setSelected(new Set())
+    else setSelected(new Set(paths))
   }
 
   async function setClipHeat(path, heat) {
@@ -734,7 +737,7 @@ export default function LibrariesPage() {
             </summary>
             <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Create custom tags here. Click a chip under any clip to apply it.
+                Create custom tags here. Open a clip’s edit modal to toggle tags, or use bulk actions when clips are selected.
               </p>
               <div className="flex gap-1.5">
                 <input
